@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Chess OCR artefacts
+models/*.pt
+models/*.pth
+data/raw/*
+data/processed/*
+data/metadata/*
+outputs/confusion_matrices/*
+outputs/failure_cases/*
+!**/.gitkeep
