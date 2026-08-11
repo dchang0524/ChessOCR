@@ -143,6 +143,28 @@ python scripts/generate_dataset.py --positions 400 --asset-theme my_theme assets
 
 Only use artwork you are licensed to use — this project never scrapes assets from chess sites.
 
+The repository also includes five attributed, open-license 2D sprite sets. To generate a broader
+digital-board dataset containing every set on three different board palettes:
+
+```bash
+python scripts/generate_dataset.py \
+  --positions 400 \
+  --no-synthetic-themes \
+  --sprite-sets chessnut fantasy spatial celtic rhosgfx \
+  --board-palettes classic green blue \
+  --output-dir data/processed/sprites_v1
+```
+
+The resulting 15 set/palette combinations are a much better starting point for 2D screenshots
+than the Unicode synthetic themes. They still do not model site UI overlays, move arrows,
+coordinates, or every proprietary piece set.
+
+By default, 80% of rendered boards also receive correlated crop jitter: each outer edge is
+independently expanded or trimmed by up to 6 pixels before the board is resized and split. This
+simulates a user crop that is slightly outside or inside the true grid. Use
+`--crop-jitter-pixels 0` to generate perfectly aligned boards, or tune the amount and frequency
+with `--crop-jitter-pixels` and `--crop-jitter-probability`.
+
 ---
 
 ## Training

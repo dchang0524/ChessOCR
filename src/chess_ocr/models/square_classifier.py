@@ -56,7 +56,7 @@ class SquareClassifier(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Run a forward pass.
 
-        Args:
+        Args:asdfasd
             x: Batch of images shaped ``(batch, 3, 64, 64)``.
 
         Returns:

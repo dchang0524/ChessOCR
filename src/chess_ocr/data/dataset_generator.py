@@ -338,6 +338,9 @@ class GenerationConfig:
         train_fraction: Fraction of positions assigned to the training split.
         val_fraction: Fraction of positions assigned to the validation split.
         seed: Seed controlling the position-level split.
+        crop_jitter_pixels: Maximum pixels independently added to or trimmed
+            from each board edge before the board is resized and split.
+        crop_jitter_probability: Share of rendered boards receiving crop jitter.
     """
 
     output_dir: Path
@@ -346,6 +349,8 @@ class GenerationConfig:
     train_fraction: float = 0.7
     val_fraction: float = 0.15
     seed: int = 0
+    crop_jitter_pixels: int = 6
+    crop_jitter_probability: float = 0.8
 
     def __post_init__(self) -> None:
         if not 0 < self.train_fraction < 1:
@@ -354,6 +359,58 @@ class GenerationConfig:
             raise ValueError("val_fraction must be in [0, 1)")
         if self.train_fraction + self.val_fraction >= 1:
             raise ValueError("train_fraction + val_fraction must leave room for a test split")
+        if self.crop_jitter_pixels < 0:
+            raise ValueError("crop_jitter_pixels must be non-negative")
+        if not 0.0 <= self.crop_jitter_probability <= 1.0:
+            raise ValueError("crop_jitter_probability must be in [0, 1]")
+
+
+def jitter_board_crop(
+    board: Image.Image,
+    max_pixels: int,
+    rng: random.Random,
+) -> Image.Image:
+    """Simulate an imperfect board crop while preserving the output dimensions.
+
+    Each edge independently moves inward or outward by up to ``max_pixels``.
+    Outward movement reveals a narrow, randomly coloured surrounding margin;
+    inward movement trims the board. The result is resized back to the original
+    dimensions, matching what :class:`BoardNormalizer` does to a user crop.
+
+    Args:
+        board: Tightly cropped board image.
+        max_pixels: Maximum absolute displacement for each edge.
+        rng: Seeded random-number generator.
+
+    Returns:
+        An RGB image with the same dimensions as ``board``.
+
+    Raises:
+        ValueError: If ``max_pixels`` is negative.
+    """
+    if max_pixels < 0:
+        raise ValueError("max_pixels must be non-negative")
+
+    source = board.convert("RGB")
+    if max_pixels == 0:
+        return source.copy()
+
+    width, height = source.size
+    base = rng.randint(20, 235)
+    border_colour = tuple(max(0, min(255, base + rng.randint(-12, 12))) for _ in range(3))
+    padded = Image.new(
+        "RGB",
+        (width + 2 * max_pixels, height + 2 * max_pixels),
+        color=border_colour,
+    )
+    padded.paste(source, (max_pixels, max_pixels))
+
+    left = max_pixels + rng.randint(-max_pixels, max_pixels)
+    top = max_pixels + rng.randint(-max_pixels, max_pixels)
+    right = max_pixels + width + rng.randint(-max_pixels, max_pixels)
+    bottom = max_pixels + height + rng.randint(-max_pixels, max_pixels)
+    crop = padded.crop((left, top, right, bottom))
+    return crop.resize((width, height), Image.Resampling.BICUBIC)
 
 
 class DatasetGenerator:
@@ -407,6 +464,7 @@ class DatasetGenerator:
         squares_dir.mkdir(parents=True, exist_ok=True)
 
         splits = self._assign_splits(len(positions))
+        augmentation_rng = random.Random(self.config.seed)
         rows: list[dict[str, object]] = []
 
         for position_index, board_fen in enumerate(positions):
@@ -416,6 +474,15 @@ class DatasetGenerator:
 
             for theme in self.themes:
                 board = theme.render_board(board_fen, self.config.board_size)
+                if (
+                    self.config.crop_jitter_pixels > 0
+                    and augmentation_rng.random() < self.config.crop_jitter_probability
+                ):
+                    board = jitter_board_crop(
+                        board,
+                        max_pixels=self.config.crop_jitter_pixels,
+                        rng=augmentation_rng,
+                    )
                 squares = self.splitter.split(board, white_at_bottom=True)
                 for index, (square_image, class_id) in enumerate(
                     zip(squares, class_ids, strict=True)

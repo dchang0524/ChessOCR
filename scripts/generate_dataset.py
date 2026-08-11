@@ -23,6 +23,7 @@ from chess_ocr.data.dataset_generator import (  # noqa: E402
 )
 
 STARTING_BOARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 BUILTIN_THEMES = {
     "synthetic_classic": SyntheticBoardTheme(
@@ -40,6 +41,17 @@ BUILTIN_THEMES = {
         light_rgb=(222, 227, 230),
         dark_rgb=(140, 162, 173),
     ),
+}
+
+BUNDLED_SPRITE_SETS = {
+    name: PROJECT_ROOT / "assets" / "themes" / name
+    for name in ("chessnut", "fantasy", "spatial", "celtic", "rhosgfx")
+}
+
+BOARD_PALETTES = {
+    "classic": ((240, 217, 181), (181, 136, 99)),
+    "green": ((238, 238, 210), (118, 150, 86)),
+    "blue": ((222, 227, 230), (104, 139, 164)),
 }
 
 
@@ -67,8 +79,39 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Additional theme from your own piece sprites: NAME DIRECTORY",
     )
+    parser.add_argument(
+        "--sprite-sets",
+        nargs="+",
+        choices=sorted(BUNDLED_SPRITE_SETS),
+        default=None,
+        help="Bundled open-license sprite sets to render across the selected board palettes",
+    )
+    parser.add_argument(
+        "--board-palettes",
+        nargs="+",
+        choices=sorted(BOARD_PALETTES),
+        default=sorted(BOARD_PALETTES),
+        help="Board palettes paired with every bundled sprite set",
+    )
+    parser.add_argument(
+        "--no-synthetic-themes",
+        action="store_true",
+        help="Skip the Unicode-glyph synthetic themes selected by --themes",
+    )
     parser.add_argument("--board-size", type=int, default=512, help="Rendered board size")
     parser.add_argument("--square-size", type=int, default=64, help="Saved square image size")
+    parser.add_argument(
+        "--crop-jitter-pixels",
+        type=int,
+        default=6,
+        help="Maximum pixels independently added to or trimmed from each board edge",
+    )
+    parser.add_argument(
+        "--crop-jitter-probability",
+        type=float,
+        default=0.8,
+        help="Fraction of rendered boards receiving imperfect-crop augmentation",
+    )
     parser.add_argument("--train-fraction", type=float, default=0.7)
     parser.add_argument("--val-fraction", type=float, default=0.15)
     parser.add_argument("--seed", type=int, default=0)
@@ -82,9 +125,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
-    themes: list[BoardTheme] = [BUILTIN_THEMES[name] for name in args.themes]
+    themes: list[BoardTheme] = (
+        [] if args.no_synthetic_themes else [BUILTIN_THEMES[name] for name in args.themes]
+    )
+    for sprite_set_name in args.sprite_sets or []:
+        directory = BUNDLED_SPRITE_SETS[sprite_set_name]
+        for palette_name in args.board_palettes:
+            light_rgb, dark_rgb = BOARD_PALETTES[palette_name]
+            themes.append(
+                ImageAssetBoardTheme(
+                    name=f"{sprite_set_name}_{palette_name}",
+                    asset_dir=directory,
+                    light_rgb=light_rgb,
+                    dark_rgb=dark_rgb,
+                )
+            )
     for name, directory in args.asset_theme or []:
         themes.append(ImageAssetBoardTheme(name=name, asset_dir=Path(directory)))
+
+    if not themes:
+        raise ValueError("Select at least one synthetic, bundled sprite, or custom asset theme")
 
     board_fens = [STARTING_BOARD_FEN] + generate_random_board_fens(
         count=max(1, args.positions - 1),
@@ -108,6 +168,8 @@ def main(argv: list[str] | None = None) -> int:
         train_fraction=args.train_fraction,
         val_fraction=args.val_fraction,
         seed=args.seed,
+        crop_jitter_pixels=args.crop_jitter_pixels,
+        crop_jitter_probability=args.crop_jitter_probability,
     )
     metadata_path = DatasetGenerator(themes=themes, config=config).generate(board_fens)
     print(f"Done. Metadata written to {metadata_path}")

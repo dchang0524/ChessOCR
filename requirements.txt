@@ -13,4 +13,5 @@ streamlit>=1.30
 streamlit-cropper>=0.2.2
 
 # Development
+resvg-py>=0.3,<1.0
 pytest>=7.4

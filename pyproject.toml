@@ -27,6 +27,7 @@ app = [
     "streamlit-cropper>=0.2.2",
 ]
 dev = [
+    "resvg-py>=0.3,<1.0",
     "pytest>=7.4",
     "ruff>=0.4",
     "mypy>=1.8",
