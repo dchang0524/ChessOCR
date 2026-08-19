@@ -1,12 +1,12 @@
 {
   "format": "onnx",
   "opset": 18,
-  "source_checkpoint": "square_classifier_kaggle.pt",
+  "source_checkpoint": "square_classifier_generated.pt",
   "source_epoch": 1,
-  "source_validation_accuracy": 1.0,
+  "source_validation_accuracy": 0.9787,
   "model_path": "square_classifier.onnx",
-  "model_sha256": "dad5c5760392ee42d701f7d94266df67015f84c4ad93a1b1ce78dd33bdf66cd5",
-  "model_bytes": 1190059,
+  "model_sha256": "dac4586de216ddf3ae2183874f1ee16d74edb6bf8b165002e8fdbd7ab9a558c8",
+  "model_bytes": 1214112,
   "input_name": "squares",
   "output_name": "logits",
   "input_size": 64,
@@ -51,5 +51,21 @@
       0.5,
       0.5
     ]
+  },
+  "background_normalization": "four-corner residual and neutral-gray compositing",
+  "similarity": {
+    "model_path": "similarity_encoder.onnx",
+    "model_sha256": "aa0fed0ff1ea7c41ac1ef29e48b8635d397a90bcf460b484bcddf530442807d2",
+    "model_bytes": 1245051,
+    "input_name": "squares",
+    "output_name": "embeddings",
+    "embedding_size": 64,
+    "similarity_threshold": 0.8935274481773376,
+    "duplicate_penalty": 1.5,
+    "background_normalization": "four-corner residual and neutral-gray compositing",
+    "includes_empty_class": true,
+    "source_checkpoint": "similarity_generated.pt",
+    "source_epoch": 2,
+    "source_validation_accuracy": 0.878
   }
 }

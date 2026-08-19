@@ -6,6 +6,7 @@ numpy>=1.26
 pandas>=2.0
 python-chess>=1.999
 scikit-learn>=1.3
+scipy>=1.11
 matplotlib>=3.8
 
 # Streamlit UI

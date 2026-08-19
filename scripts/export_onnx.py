@@ -90,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
         "class_names": class_names,
         "fen_symbols": [CLASS_TO_FEN[name] for name in class_names],
         "normalization": {"mean": [0.5, 0.5, 0.5], "std": [0.5, 0.5, 0.5]},
+        "background_normalization": "four-corner residual and neutral-gray compositing",
     }
     args.metadata.parent.mkdir(parents=True, exist_ok=True)
     args.metadata.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")

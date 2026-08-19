@@ -67,10 +67,17 @@ Inference runs only when the button is pressed — moving the crop box never tri
                     │  64 PIL squares
                     ▼
         BoardPredictor           inference/board_predictor.py
-        transform -> stack -> single batched forward pass -> softmax
-                    │  64 x (class id, confidence)
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+  SquareClassifier     SimilarityClassifier
+  neutralise background in both -> 13 logits + 64-D embedding
+          │                   │
+          │            complete-linkage clustering
+          └─────────┬─────────┘
                     ▼
-        SquareClassifier         models/square_classifier.py   (raw logits, no softmax)
+        soft global group-label assignment
+        duplicate penalties + fixed user corrections
                     │
                     ▼
         FenBuilder               chess/fen_builder.py          (no PyTorch dependency)
@@ -188,6 +195,56 @@ The checkpoint with the best validation accuracy is saved as a dictionary:
     "validation_accuracy": ...,
 }
 ```
+
+### Theme-relative grouping experiment
+
+Train both models from random initialization using generated sprite data only:
+
+```bash
+python scripts/train_model.py \
+  --metadata data/processed/sprites_v1/metadata.csv \
+  --checkpoint models/square_classifier_generated.pt \
+  --epochs 1 --max-train-squares 80000 --max-val-squares 20000
+
+python scripts/train_similarity.py \
+  --metadata data/processed/sprites_v1/metadata.csv \
+  --checkpoint models/similarity_generated.pt \
+  --epochs 2 --pairs-per-epoch 20000 --validation-pairs 5000
+```
+
+Both CNNs estimate each square's board colour from its four corners, subtract that colour, and
+soft-mask background-like pixels to neutral gray. Because this parameter-free module is inside
+both model graphs, the same operation runs during augmented training, Python inference, and ONNX
+browser inference. The Siamese sampler includes all 13 labels, including empty: same-label pairs
+are positive, different-label pairs are negative, and opposite light/dark-square positives are
+preferred. At inference all 64 squares are clustered, so empty is an appearance group rather than
+a baseline occupancy filter. Empty may be assigned to multiple clusters without a repeat penalty
+if conservative clustering splits the background.
+
+Create an inspectable random Kaggle sample using the exact model preprocessing:
+
+```bash
+python scripts/sample_background_neutralization.py --count 6 --seed 42
+```
+
+This writes individual neutralized boards and a side-by-side montage under
+`outputs/background_neutralization/`.
+
+Evaluate independent classification and grouped assignment on evaluation-only Kaggle themes:
+
+```bash
+python scripts/evaluate_grouped_kaggle.py \
+  --classifier-checkpoint models/square_classifier_generated.pt \
+  --similarity-checkpoint models/similarity_generated.pt \
+  --image-dir data/raw/kaggle_chess_positions/test \
+  --max-boards 50
+```
+
+The empty-aware checkpoint calibrates a conservative `0.8935` cutoff on generated validation
+pairs. A 50-board external smoke test improved square accuracy from 85.81% to 89.19% and occupied
+accuracy from 43.65% to 53.04%; this small prefix is a pipeline check, not a final benchmark. The
+evaluator reports baseline versus grouped square, occupied-square and exact-board accuracy plus
+false-merge and false-split rates across all 64 squares.
 
 ---
 

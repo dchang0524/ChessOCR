@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import torch  # noqa: E402
-from torch.utils.data import DataLoader  # noqa: E402
+from torch.utils.data import DataLoader, Dataset, Subset  # noqa: E402
 
 from chess_ocr.data.labels import CLASS_NAMES  # noqa: E402
 from chess_ocr.data.square_dataset import (  # noqa: E402
@@ -58,6 +58,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--input-size", type=int, default=64)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument(
+        "--max-train-squares",
+        type=int,
+        default=None,
+        help="Optional deterministic generated-data subset for bounded experiments",
+    )
+    parser.add_argument("--max-val-squares", type=int, default=None)
+    parser.add_argument("--sample-seed", type=int, default=42)
+    parser.add_argument(
         "--device",
         type=str,
         default=None,
@@ -91,15 +99,35 @@ def main(argv: list[str] | None = None) -> int:
     print(f"train squares: {len(train_dataset)} | val squares: {len(val_dataset)}")
     print(f"train class distribution: {train_dataset.class_distribution()}")
 
+    def bounded_subset(dataset: Dataset, maximum: int | None, seed: int) -> Dataset:
+        if maximum is None or maximum >= len(dataset):
+            return dataset
+        if maximum <= 0:
+            raise ValueError("Dataset subset limits must be positive")
+        generator = torch.Generator().manual_seed(seed)
+        indices = torch.randperm(len(dataset), generator=generator)[:maximum].tolist()
+        return Subset(dataset, indices)
+
+    effective_train_dataset = bounded_subset(
+        train_dataset, args.max_train_squares, args.sample_seed
+    )
+    effective_val_dataset = bounded_subset(
+        val_dataset, args.max_val_squares, args.sample_seed + 1
+    )
+    print(
+        f"effective train squares: {len(effective_train_dataset)} | "
+        f"effective val squares: {len(effective_val_dataset)}"
+    )
+
     train_loader = DataLoader(
-        train_dataset,
+        effective_train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
         drop_last=False,
     )
     val_loader = DataLoader(
-        val_dataset,
+        effective_val_dataset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
@@ -127,6 +155,13 @@ def main(argv: list[str] | None = None) -> int:
         checkpoint_metadata={
             "training_metadata": str(args.metadata),
             "initial_checkpoint": initial_checkpoint,
+            "trained_from_scratch": args.initial_checkpoint is None,
+            "background_normalization": (
+                "four-corner residual and neutral-gray compositing"
+            ),
+            "train_square_count": len(effective_train_dataset),
+            "validation_square_count": len(effective_val_dataset),
+            "sample_seed": args.sample_seed,
         },
     )
     history = trainer.fit(train_loader, val_loader, epochs=args.epochs)

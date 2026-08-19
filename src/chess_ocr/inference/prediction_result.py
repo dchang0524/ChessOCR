@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 DEFAULT_LOW_CONFIDENCE_THRESHOLD = 0.80
 
@@ -26,6 +26,24 @@ class SquarePrediction:
     fen_symbol: str
     confidence: float
     probabilities: list[float]
+    group_id: int | None = None
+    raw_class_id: int | None = None
+    raw_class_name: str | None = None
+    raw_logits: list[float] = field(default_factory=list)
+
+
+@dataclass
+class PieceGroupPrediction:
+    """Prediction and membership information for one appearance group."""
+
+    group_id: int
+    squares: list[str]
+    class_id: int
+    class_name: str
+    confidence: float
+    clustering_confidence: float
+    class_probabilities: list[float]
+    user_corrected: bool = False
 
 
 @dataclass
@@ -49,6 +67,7 @@ class BoardPrediction:
     mean_confidence: float
     minimum_confidence: float
     low_confidence_squares: list[str]
+    groups: list[PieceGroupPrediction] = field(default_factory=list)
 
     def to_rows(self) -> list[dict[str, object]]:
         """Return the per-square predictions as table rows for display.

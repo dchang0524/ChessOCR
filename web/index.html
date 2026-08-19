@@ -98,6 +98,17 @@
             </div>
           </div>
 
+          <div id="correction-panel" class="correction-panel" hidden>
+            <p class="panel-label">Correct a prediction</p>
+            <p id="correction-summary"></p>
+            <div class="correction-controls">
+              <select id="correction-class" aria-label="Correct piece class"></select>
+              <button id="apply-square" class="ghost-button" type="button">Apply to this square</button>
+              <button id="apply-group" class="primary-button compact" type="button">Apply to whole group</button>
+            </div>
+            <p class="assumption">Click any square on the predicted board. Group corrections are fixed while the remaining groups are reassigned.</p>
+          </div>
+
           <div class="fen-group">
             <p class="panel-label">Detected board FEN</p>
             <div class="fen-line"><code id="board-fen"></code><button class="copy-button" data-copy="board-fen" type="button">Copy</button></div>

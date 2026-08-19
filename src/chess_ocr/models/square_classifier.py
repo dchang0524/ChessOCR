@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 from chess_ocr.data.labels import NUM_CLASSES
+from chess_ocr.models.background_normalizer import SquareBackgroundNormalizer
 
 INPUT_SIZE = 64
 
@@ -41,6 +42,7 @@ class SquareClassifier(nn.Module):
         """
         super().__init__()
         self.num_classes = num_classes
+        self.background_normalizer = SquareBackgroundNormalizer()
         self.features = nn.Sequential(
             _conv_block(3, 32),
             _conv_block(32, 64),
@@ -56,7 +58,7 @@ class SquareClassifier(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Run a forward pass.
 
-        Args:asdfasd
+        Args:
             x: Batch of images shaped ``(batch, 3, 64, 64)``.
 
         Returns:
@@ -67,6 +69,6 @@ class SquareClassifier(nn.Module):
         """
         if x.dim() != 4 or x.shape[1] != 3:
             raise ValueError(f"Expected input of shape (batch, 3, H, W), got {tuple(x.shape)}")
-        features = self.features(x)
+        features = self.features(self.background_normalizer(x))
         pooled = self.pool(features)
         return self.classifier(pooled)

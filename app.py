@@ -25,7 +25,8 @@ from chess_ocr.chess.position_validator import PositionValidator
 from chess_ocr.inference.board_predictor import BoardPredictor
 from chess_ocr.inference.prediction_result import BoardPrediction
 
-DEFAULT_CHECKPOINT = "models/square_classifier_kaggle.pt"
+DEFAULT_CHECKPOINT = "models/square_classifier_generated.pt"
+DEFAULT_SIMILARITY_CHECKPOINT = "models/similarity_generated.pt"
 SUPPORTED_UPLOAD_TYPES = ["png", "jpg", "jpeg"]
 ASSUMED_FIELD_NOTE = (
     "The classifier only reads piece placement. Castling rights, en passant "
@@ -34,17 +35,22 @@ ASSUMED_FIELD_NOTE = (
 
 
 @st.cache_resource(show_spinner="Loading model checkpoint...")
-def load_predictor(checkpoint_path: str, device: str | None) -> BoardPredictor:
+def load_predictor(
+    checkpoint_path: str, similarity_checkpoint_path: str, device: str | None
+) -> BoardPredictor:
     """Load and cache the predictor for a checkpoint.
 
     Args:
         checkpoint_path: Path to a checkpoint written by the trainer.
+        similarity_checkpoint_path: Path to the Siamese similarity checkpoint.
         device: Device string, or ``None`` to auto-detect.
 
     Returns:
         A cached :class:`BoardPredictor`.
     """
-    return BoardPredictor.from_checkpoint(checkpoint_path, device=device)
+    return BoardPredictor.from_checkpoints(
+        checkpoint_path, similarity_checkpoint_path, device=device
+    )
 
 
 def render_svg(svg: str, height: int = 420) -> None:
@@ -52,13 +58,19 @@ def render_svg(svg: str, height: int = 420) -> None:
     components.html(f'<div style="display:flex;justify-content:center">{svg}</div>', height=height)
 
 
-def show_results(prediction: BoardPrediction, crop: Image.Image, white_at_bottom: bool) -> None:
+def show_results(
+    prediction: BoardPrediction,
+    crop: Image.Image,
+    white_at_bottom: bool,
+    predictor: BoardPredictor,
+) -> None:
     """Render every output panel for a completed prediction.
 
     Args:
         prediction: The board prediction to display.
         crop: The cropped board image that was recognised.
         white_at_bottom: Orientation used for the reconstructed board.
+        predictor: Predictor used to apply and propagate group corrections.
     """
     left, right = st.columns(2)
     with left:
@@ -120,6 +132,30 @@ def show_results(prediction: BoardPrediction, crop: Image.Image, white_at_bottom
             mime="text/csv",
         )
 
+    if prediction.groups:
+        st.subheader("Correct an appearance group")
+        group_by_label = {
+            f"Group {group.group_id}: {', '.join(group.squares)} → {group.class_name}": group
+            for group in prediction.groups
+        }
+        selected_label = st.selectbox("Appearance group", list(group_by_label))
+        selected_group = group_by_label[selected_label]
+        class_names = predictor.class_names
+        selected_class_name = st.selectbox(
+            "Correct class",
+            class_names,
+            index=(
+                class_names.index(selected_group.class_name)
+                if selected_group.class_name in class_names
+                else 0
+            ),
+        )
+        if st.button("Apply correction to whole group"):
+            class_id = predictor.class_names.index(selected_class_name)
+            predictor.apply_group_correction(prediction, selected_group.group_id, class_id)
+            st.session_state["prediction"] = prediction
+            st.rerun()
+
 
 def main() -> None:
     """Run the Streamlit application."""
@@ -132,6 +168,9 @@ def main() -> None:
     with st.sidebar:
         st.header("Settings")
         checkpoint_path = st.text_input("Checkpoint path", value=DEFAULT_CHECKPOINT)
+        similarity_checkpoint_path = st.text_input(
+            "Similarity checkpoint path", value=DEFAULT_SIMILARITY_CHECKPOINT
+        )
         device_choice = st.selectbox("Device", ["auto", "cpu", "cuda", "mps"], index=0)
         threshold = st.slider(
             "Low-confidence threshold", min_value=0.0, max_value=1.0, value=0.80, step=0.01
@@ -193,7 +232,9 @@ def main() -> None:
     if st.button("Recognize Position", type="primary"):
         try:
             predictor = load_predictor(
-                checkpoint_path, None if device_choice == "auto" else device_choice
+                checkpoint_path,
+                similarity_checkpoint_path,
+                None if device_choice == "auto" else device_choice,
             )
         except FileNotFoundError:
             st.error(
@@ -219,6 +260,7 @@ def main() -> None:
         st.session_state["prediction"] = prediction
         st.session_state["crop"] = crop
         st.session_state["white_at_bottom"] = white_at_bottom
+        st.session_state["predictor"] = predictor
 
     if "prediction" in st.session_state:
         st.markdown("---")
@@ -226,6 +268,7 @@ def main() -> None:
             st.session_state["prediction"],
             st.session_state["crop"],
             st.session_state["white_at_bottom"],
+            st.session_state["predictor"],
         )
 
 

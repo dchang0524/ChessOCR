@@ -1,4 +1,9 @@
 import { PIECE_GLYPHS, bestClass, buildBoardFen, squareName } from "./chess.js";
+import {
+  assignGroupLabels,
+  completeLinkageClusters,
+  cosineSimilarityMatrix,
+} from "./grouping.js";
 
 const ORT_VERSION = "1.22.0";
 const BOARD_SIZE = 512;
@@ -31,6 +36,11 @@ const elements = {
   predictionRows: document.querySelector("#prediction-rows"),
   timing: document.querySelector("#timing"),
   error: document.querySelector("#error"),
+  correctionPanel: document.querySelector("#correction-panel"),
+  correctionSummary: document.querySelector("#correction-summary"),
+  correctionClass: document.querySelector("#correction-class"),
+  applySquare: document.querySelector("#apply-square"),
+  applyGroup: document.querySelector("#apply-group"),
 };
 
 const editorContext = elements.editor.getContext("2d");
@@ -40,9 +50,17 @@ const state = {
   image: null,
   crop: null,
   interaction: null,
-  session: null,
+  classifierSession: null,
+  similaritySession: null,
   metadata: null,
   modelReady: false,
+  rawPredictions: null,
+  predictions: null,
+  groups: [],
+  fixedGroupLabels: new Map(),
+  squareOverrides: new Map(),
+  selectedSquare: null,
+  elapsedMilliseconds: 0,
 };
 
 function setError(message = "") {
@@ -61,15 +79,27 @@ async function loadModel() {
     const metadataResponse = await fetch("./model/model.json");
     if (!metadataResponse.ok) throw new Error(`Model metadata returned ${metadataResponse.status}`);
     state.metadata = await metadataResponse.json();
+    elements.correctionClass.replaceChildren();
+    state.metadata.class_names.forEach((className, classId) => {
+      const option = document.createElement("option");
+      option.value = String(classId);
+      option.textContent = className.replaceAll("_", " ");
+      elements.correctionClass.append(option);
+    });
 
     window.ort.env.wasm.numThreads = 1;
     window.ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
-    state.session = await window.ort.InferenceSession.create(
-      `./model/${state.metadata.model_path}`,
-      { executionProviders: ["wasm"], graphOptimizationLevel: "all" },
-    );
+    const options = { executionProviders: ["wasm"], graphOptimizationLevel: "all" };
+    [state.classifierSession, state.similaritySession] = await Promise.all([
+      window.ort.InferenceSession.create(`./model/${state.metadata.model_path}`, options),
+      window.ort.InferenceSession.create(
+        `./model/${state.metadata.similarity.model_path}`,
+        options,
+      ),
+    ]);
     state.modelReady = true;
-    setModelStatus(`Model ready · ${(state.metadata.model_bytes / 1_000_000).toFixed(1)} MB`, "ready");
+    const modelBytes = state.metadata.model_bytes + state.metadata.similarity.model_bytes;
+    setModelStatus(`Models ready · ${(modelBytes / 1_000_000).toFixed(1)} MB`, "ready");
     updateRecognizeButton();
   } catch (error) {
     console.error(error);
@@ -126,6 +156,13 @@ async function acceptFile(file) {
     setError();
     elements.uploadZone.querySelector("strong").textContent = "Opening image…";
     state.image = await decodeImage(file);
+    state.rawPredictions = null;
+    state.predictions = null;
+    state.groups = [];
+    state.fixedGroupLabels.clear();
+    state.squareOverrides.clear();
+    state.selectedSquare = null;
+    elements.correctionPanel.hidden = true;
     resetCrop();
     elements.editorSection.hidden = false;
     elements.resultSection.hidden = true;
@@ -344,11 +381,80 @@ function readPredictions(logits) {
   const predictions = new Array(NUM_SQUARES);
   for (let rasterIndex = 0; rasterIndex < NUM_SQUARES; rasterIndex += 1) {
     const start = rasterIndex * classCount;
-    const result = bestClass(Array.from(logits.data.slice(start, start + classCount)));
+    const rawLogits = Array.from(logits.data.slice(start, start + classCount));
+    const result = bestClass(rawLogits);
     const fenIndex = whiteAtBottom ? rasterIndex : NUM_SQUARES - 1 - rasterIndex;
-    predictions[fenIndex] = { ...result, square: squareName(fenIndex) };
+    predictions[fenIndex] = {
+      ...result,
+      rawClassId: result.classId,
+      logits: rawLogits,
+      square: squareName(fenIndex),
+      groupId: null,
+    };
   }
   return predictions;
+}
+
+function readEmbeddings(tensor) {
+  const embeddingSize = state.metadata.similarity.embedding_size;
+  if (tensor.dims[0] !== NUM_SQUARES || tensor.dims[1] !== embeddingSize) {
+    throw new Error(`Unexpected embedding shape: ${tensor.dims.join(" × ")}`);
+  }
+  const whiteAtBottom = elements.orientation.value === "white";
+  const embeddings = new Array(NUM_SQUARES);
+  for (let rasterIndex = 0; rasterIndex < NUM_SQUARES; rasterIndex += 1) {
+    const fenIndex = whiteAtBottom ? rasterIndex : NUM_SQUARES - 1 - rasterIndex;
+    const start = rasterIndex * embeddingSize;
+    embeddings[fenIndex] = Array.from(tensor.data.slice(start, start + embeddingSize));
+  }
+  return embeddings;
+}
+
+function buildGroups(rawPredictions, embeddings) {
+  const candidates = rawPredictions.map((_, index) => index);
+  const embeddingSize = state.metadata.similarity.embedding_size;
+  const compact = new Float32Array(candidates.length * embeddingSize);
+  candidates.forEach((squareIndex, row) => {
+    compact.set(embeddings[squareIndex], row * embeddingSize);
+  });
+  const similarities = cosineSimilarityMatrix(compact, candidates.length, embeddingSize);
+  return completeLinkageClusters(
+    similarities,
+    candidates,
+    state.metadata.similarity.similarity_threshold,
+  );
+}
+
+function applyGroupedAssignments() {
+  const classCount = state.metadata.class_names.length;
+  const squareLogits = state.rawPredictions.map((prediction) => prediction.logits);
+  const assignments = assignGroupLabels(
+    squareLogits,
+    state.groups,
+    classCount,
+    state.metadata.similarity.duplicate_penalty,
+    state.fixedGroupLabels,
+  );
+  const assignmentByGroup = new Map(
+    assignments.map((assignment) => [assignment.groupId, assignment]),
+  );
+  const predictions = state.rawPredictions.map((prediction) => ({ ...prediction }));
+  for (const group of state.groups) {
+    const assignment = assignmentByGroup.get(group.groupId);
+    group.classId = assignment.classId;
+    group.assignmentConfidence = assignment.confidence;
+    for (const squareIndex of group.squareIndices) {
+      predictions[squareIndex].classId = assignment.classId;
+      predictions[squareIndex].confidence = assignment.confidence;
+      predictions[squareIndex].probabilities = assignment.probabilities;
+      predictions[squareIndex].groupId = group.groupId;
+    }
+  }
+  for (const [squareIndex, classId] of state.squareOverrides) {
+    predictions[squareIndex].classId = classId;
+    predictions[squareIndex].confidence = 1;
+  }
+  state.predictions = predictions;
 }
 
 function renderBoard(predictions, threshold) {
@@ -361,13 +467,36 @@ function renderBoard(predictions, threshold) {
     const row = Math.floor(displayIndex / 8);
     const column = displayIndex % 8;
     cell.className = `board-square ${(row + column) % 2 === 0 ? "light" : "dark"}`;
+    cell.dataset.squareIndex = String(fenIndex);
     if (prediction.confidence < threshold) cell.classList.add("uncertain");
+    if (state.selectedSquare !== null) {
+      const selected = predictions[state.selectedSquare];
+      if (fenIndex === state.selectedSquare) cell.classList.add("selected-square");
+      if (selected.groupId !== null && prediction.groupId === selected.groupId) {
+        cell.classList.add("selected-group");
+      }
+    }
     const symbol = state.metadata.fen_symbols[prediction.classId];
     if (symbol) cell.classList.add(symbol === symbol.toUpperCase() ? "white-piece" : "black-piece");
     cell.textContent = PIECE_GLYPHS[symbol] ?? "";
     cell.title = `${prediction.square}: ${state.metadata.class_names[prediction.classId]} (${(prediction.confidence * 100).toFixed(1)}%)`;
+    cell.addEventListener("click", () => selectSquare(fenIndex));
     elements.predictedBoard.append(cell);
   }
+}
+
+function selectSquare(squareIndex) {
+  if (!state.predictions) return;
+  state.selectedSquare = squareIndex;
+  const prediction = state.predictions[squareIndex];
+  const group = state.groups.find((candidate) => candidate.groupId === prediction.groupId);
+  elements.correctionClass.value = String(prediction.classId);
+  elements.correctionSummary.textContent = group
+    ? `${prediction.square} belongs to group ${group.groupId}: ${group.squareIndices.map(squareName).join(", ")}`
+    : `${prediction.square} is not in an appearance group.`;
+  elements.applyGroup.disabled = !group;
+  elements.correctionPanel.hidden = false;
+  renderBoard(state.predictions, Number(elements.threshold.value));
 }
 
 function renderPredictionTable(predictions, threshold) {
@@ -420,7 +549,7 @@ function showResults(predictions, elapsedMilliseconds) {
 }
 
 async function recognize() {
-  if (!state.image || !state.session) return;
+  if (!state.image || !state.classifierSession || !state.similaritySession) return;
   setError();
   elements.recognize.disabled = true;
   elements.recognize.textContent = "Recognizing…";
@@ -428,10 +557,27 @@ async function recognize() {
   try {
     const tensor = prepareInputTensor();
     const start = performance.now();
-    const outputs = await state.session.run({ [state.metadata.input_name]: tensor });
+    // ONNX Runtime Web's single WASM worker cannot execute two sessions at
+    // once. Run them sequentially while reusing the same immutable input.
+    const classifierOutputs = await state.classifierSession.run({
+      [state.metadata.input_name]: tensor,
+    });
+    const similarityOutputs = await state.similaritySession.run({
+      [state.metadata.similarity.input_name]: tensor,
+    });
     const elapsed = performance.now() - start;
-    const predictions = readPredictions(outputs[state.metadata.output_name]);
-    showResults(predictions, elapsed);
+    state.rawPredictions = readPredictions(classifierOutputs[state.metadata.output_name]);
+    const embeddings = readEmbeddings(
+      similarityOutputs[state.metadata.similarity.output_name],
+    );
+    state.groups = buildGroups(state.rawPredictions, embeddings);
+    state.fixedGroupLabels.clear();
+    state.squareOverrides.clear();
+    state.selectedSquare = null;
+    state.elapsedMilliseconds = elapsed;
+    applyGroupedAssignments();
+    elements.correctionPanel.hidden = true;
+    showResults(state.predictions, elapsed);
   } catch (error) {
     console.error(error);
     setError(`Recognition failed: ${error.message}`);
@@ -465,6 +611,22 @@ elements.threshold.addEventListener("input", () => {
   elements.thresholdValue.textContent = `${Math.round(Number(elements.threshold.value) * 100)}%`;
 });
 elements.recognize.addEventListener("click", recognize);
+elements.applySquare.addEventListener("click", () => {
+  if (state.selectedSquare === null) return;
+  state.squareOverrides.set(state.selectedSquare, Number(elements.correctionClass.value));
+  applyGroupedAssignments();
+  showResults(state.predictions, state.elapsedMilliseconds);
+  selectSquare(state.selectedSquare);
+});
+elements.applyGroup.addEventListener("click", () => {
+  if (state.selectedSquare === null) return;
+  const groupId = state.predictions[state.selectedSquare].groupId;
+  if (groupId === null) return;
+  state.fixedGroupLabels.set(groupId, Number(elements.correctionClass.value));
+  applyGroupedAssignments();
+  showResults(state.predictions, state.elapsedMilliseconds);
+  selectSquare(state.selectedSquare);
+});
 document.querySelectorAll("[data-copy]").forEach((button) => {
   button.addEventListener("click", async () => {
     const target = document.querySelector(`#${button.dataset.copy}`);

@@ -34,6 +34,19 @@ class ScriptedModel(nn.Module):
         return logits
 
 
+class ScriptedSimilarity(nn.Module):
+    """Return identical embeddings for scripted semantic classes."""
+
+    def __init__(self, class_ids: list[int]) -> None:
+        super().__init__()
+        self.class_ids = class_ids
+
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.nn.functional.one_hot(
+            torch.tensor(self.class_ids[: x.shape[0]]), num_classes=13
+        ).float()
+
+
 class RecordingNormalizer(BoardNormalizer):
     def __init__(self, output_size: int = 512) -> None:
         super().__init__(output_size)
@@ -218,3 +231,61 @@ def test_to_rows_exposes_table_columns() -> None:
     assert len(rows) == 64
     assert set(rows[0]) == {"square", "predicted_class", "fen_symbol", "confidence"}
     assert rows[0]["square"] == "a8"
+
+
+def test_similarity_groups_same_piece_squares_and_assigns_labels() -> None:
+    class_ids = board_fen_to_class_ids(STARTING_BOARD_FEN)
+    predictor, _, _, _ = build_predictor(class_ids)
+    predictor.similarity_model = ScriptedSimilarity(class_ids)  # type: ignore[assignment]
+    predictor.clusterer = predictor.clusterer.__class__(0.99)
+
+    result = predictor.predict(dummy_image())
+
+    white_pawn_groups = [group for group in result.groups if group.class_name == "white_pawn"]
+    assert len(white_pawn_groups) == 1
+    assert set(white_pawn_groups[0].squares) == {
+        "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2"
+    }
+    assert result.board_fen == STARTING_BOARD_FEN
+
+
+def test_group_correction_propagates_to_every_group_member() -> None:
+    pawn = CLASS_NAME_TO_ID["white_pawn"]
+    bishop = CLASS_NAME_TO_ID["white_bishop"]
+    class_ids = [EMPTY] * 64
+    class_ids[48] = pawn
+    class_ids[49] = pawn
+    predictor, _, _, _ = build_predictor(class_ids)
+    predictor.similarity_model = ScriptedSimilarity(class_ids)  # type: ignore[assignment]
+    predictor.clusterer = predictor.clusterer.__class__(0.99)
+    result = predictor.predict(dummy_image())
+    pawn_group = next(group for group in result.groups if group.class_id == pawn)
+
+    corrected = predictor.apply_group_correction(result, pawn_group.group_id, bishop)
+
+    assert corrected.squares[48].class_id == bishop
+    assert corrected.squares[49].class_id == bishop
+    corrected_group = next(
+        group for group in corrected.groups if group.group_id == pawn_group.group_id
+    )
+    assert corrected_group.user_corrected
+
+
+def test_empty_squares_form_a_group_and_can_be_corrected_to_empty() -> None:
+    pawn = CLASS_NAME_TO_ID["white_pawn"]
+    class_ids = [EMPTY] * 64
+    class_ids[0] = pawn
+    predictor, _, _, _ = build_predictor(class_ids)
+    predictor.similarity_model = ScriptedSimilarity(class_ids)  # type: ignore[assignment]
+    predictor.clusterer = predictor.clusterer.__class__(0.99)
+
+    result = predictor.predict(dummy_image())
+    empty_group = next(group for group in result.groups if group.class_id == EMPTY)
+    assert len(empty_group.squares) == 63
+
+    corrected = predictor.apply_group_correction(result, empty_group.group_id, EMPTY)
+    corrected_group = next(
+        group for group in corrected.groups if group.group_id == empty_group.group_id
+    )
+    assert corrected_group.class_id == EMPTY
+    assert corrected_group.user_corrected
