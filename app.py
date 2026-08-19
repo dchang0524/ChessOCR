@@ -25,7 +25,7 @@ from chess_ocr.chess.position_validator import PositionValidator
 from chess_ocr.inference.board_predictor import BoardPredictor
 from chess_ocr.inference.prediction_result import BoardPrediction
 
-DEFAULT_CHECKPOINT = "models/square_classifier.pt"
+DEFAULT_CHECKPOINT = "models/square_classifier_kaggle.pt"
 SUPPORTED_UPLOAD_TYPES = ["png", "jpg", "jpeg"]
 ASSUMED_FIELD_NOTE = (
     "The classifier only reads piece placement. Castling rights, en passant "

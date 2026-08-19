@@ -1,0 +1,311 @@
+{
+  "checkpoint": "models/square_classifier_kaggle.pt",
+  "image_dir": "data/raw/kaggle_chess_positions",
+  "manifest": "data/metadata/kaggle_80_10_10.csv",
+  "split": "test",
+  "elapsed_seconds": 385.16803725005593,
+  "overall_accuracy": 1.0,
+  "empty_accuracy": 1.0,
+  "occupied_accuracy": 1.0,
+  "per_class": [
+    {
+      "class_name": "empty",
+      "support": 540055,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "white_pawn",
+      "support": 9031,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "white_knight",
+      "support": 8853,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "white_bishop",
+      "support": 8894,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "white_rook",
+      "support": 8766,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "white_queen",
+      "support": 4417,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "white_king",
+      "support": 10000,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "black_pawn",
+      "support": 9151,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "black_knight",
+      "support": 8736,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "black_bishop",
+      "support": 8880,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "black_rook",
+      "support": 8898,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "black_queen",
+      "support": 4319,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "class_name": "black_king",
+      "support": 10000,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0
+    }
+  ],
+  "board_metrics": {
+    "board_count": 10000,
+    "exact_board_accuracy": 1.0,
+    "mean_incorrect_squares": 0.0,
+    "error_distribution": {
+      "0": 1.0,
+      "1": 0.0,
+      "2": 0.0,
+      "3+": 0.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      540055,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      9031,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      8853,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      8894,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      8766,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      4417,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      10000,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      9151,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      8736,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      8880,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      8898,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4319,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      10000
+    ]
+  ]
+}

@@ -14,4 +14,6 @@ streamlit-cropper>=0.2.2
 
 # Development
 resvg-py>=0.3,<1.0
+onnx>=1.16,<2
+onnxscript>=0.5,<1
 pytest>=7.4

@@ -27,6 +27,8 @@ app = [
     "streamlit-cropper>=0.2.2",
 ]
 dev = [
+    "onnx>=1.16,<2",
+    "onnxscript>=0.5,<1",
     "resvg-py>=0.3,<1.0",
     "pytest>=7.4",
     "ruff>=0.4",

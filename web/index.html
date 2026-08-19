@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Turn a digital chessboard screenshot into FEN directly in your browser.">
+    <title>Chess OCR — Screenshot to FEN</title>
+    <link rel="stylesheet" href="./styles.css?v=20260813">
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div class="brand"><span class="brand-mark" aria-hidden="true">♞</span> Chess OCR</div>
+        <div id="model-status" class="model-status" data-mode="loading" aria-live="polite">Loading model…</div>
+      </header>
+
+      <main>
+        <section class="hero">
+          <p class="eyebrow">Screenshot → position</p>
+          <h1>Turn a chessboard into FEN.</h1>
+          <p class="lede">Upload a clean 2D board screenshot, align the crop, and classify all 64 squares directly on your device.</p>
+        </section>
+
+        <section class="card" aria-labelledby="upload-heading">
+          <div class="section-heading">
+            <div>
+              <h2 id="upload-heading">1. Choose a screenshot</h2>
+              <p>Choose a screenshot or photo from your device. The board can be part of a larger image.</p>
+            </div>
+          </div>
+          <div id="upload-zone" class="upload-zone">
+            <div>
+              <span class="upload-icon" aria-hidden="true">↥</span>
+              <strong>Drop a screenshot here</strong>
+              <span>or choose one from your device</span>
+              <label for="upload">Choose image</label>
+              <input id="upload" type="file" accept="image/*">
+            </div>
+          </div>
+          <p class="privacy"><strong>Private by design.</strong> Your screenshot is decoded and classified locally in this browser; it is never uploaded to an inference server.</p>
+          <p id="error" class="error" role="alert" hidden></p>
+        </section>
+
+        <section id="editor-section" class="card" aria-labelledby="crop-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <h2 id="crop-heading">2. Align the board</h2>
+              <p>Drag inside the square to move it. Drag a corner to resize it around the 8×8 grid.</p>
+            </div>
+          </div>
+          <div class="editor-wrap"><canvas id="crop-editor" aria-label="Interactive square board crop"></canvas></div>
+          <div class="editor-toolbar">
+            <span id="crop-size">—</span>
+            <button id="reset-crop" class="ghost-button" type="button">Reset crop</button>
+          </div>
+
+          <div class="controls">
+            <div class="control">
+              <label for="orientation">Board orientation</label>
+              <select id="orientation">
+                <option value="white">White at bottom</option>
+                <option value="black">Black at bottom</option>
+              </select>
+            </div>
+            <div class="control">
+              <label for="side-to-move">Side to move (assumed)</label>
+              <select id="side-to-move">
+                <option value="none">Not specified</option>
+                <option value="w">White</option>
+                <option value="b">Black</option>
+              </select>
+            </div>
+            <div class="control">
+              <label class="range-label" for="threshold"><span>Confidence threshold</span><span id="threshold-value">80%</span></label>
+              <input id="threshold" type="range" min="0" max="1" value="0.8" step="0.01">
+            </div>
+          </div>
+          <button id="recognize" class="primary-button" type="button" disabled>Recognize position</button>
+        </section>
+
+        <section id="result-section" class="card" aria-labelledby="result-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <h2 id="result-heading">3. Review the position</h2>
+              <p id="timing">Classified 64 squares locally.</p>
+            </div>
+          </div>
+          <div class="result-grid">
+            <div>
+              <p class="panel-label">Your crop</p>
+              <div class="preview-frame"><canvas id="crop-preview" width="512" height="512"></canvas></div>
+            </div>
+            <div>
+              <p class="panel-label">Predicted board</p>
+              <div id="predicted-board" class="predicted-board" aria-label="Predicted chess position"></div>
+            </div>
+          </div>
+
+          <div class="fen-group">
+            <p class="panel-label">Detected board FEN</p>
+            <div class="fen-line"><code id="board-fen"></code><button class="copy-button" data-copy="board-fen" type="button">Copy</button></div>
+          </div>
+          <div id="full-fen-group" class="fen-group" hidden>
+            <p class="panel-label">Assumed complete FEN</p>
+            <div class="fen-line"><code id="full-fen"></code><button class="copy-button" data-copy="full-fen" type="button">Copy</button></div>
+            <p class="assumption">Castling rights, en passant target, and move clocks are assumed—not detected from the image.</p>
+          </div>
+
+          <div class="metrics">
+            <div class="metric"><span>Mean confidence</span><strong id="mean-confidence">—</strong></div>
+            <div class="metric"><span>Minimum confidence</span><strong id="minimum-confidence">—</strong></div>
+            <div class="metric"><span>Low-confidence squares</span><strong id="low-confidence">—</strong></div>
+          </div>
+          <p id="confidence-note" class="confidence-note"></p>
+
+          <details>
+            <summary>Per-square predictions</summary>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Square</th><th>Prediction</th><th>FEN</th><th>Confidence</th></tr></thead>
+                <tbody id="prediction-rows"></tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+      </main>
+
+      <footer>Chess OCR · Inference runs with ONNX Runtime Web on your device.</footer>
+    </div>
+  </body>
+</html>

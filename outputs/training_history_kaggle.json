@@ -1,0 +1,19 @@
+{
+  "epochs": [
+    {
+      "epoch": 1,
+      "train_loss": 0.3196012195350542,
+      "train_accuracy": 0.9988100742419257,
+      "val_loss": 0.3042614501953125,
+      "val_accuracy": 1.0,
+      "seconds": 4838.960554124904
+    }
+  ],
+  "best_epoch": 1,
+  "best_val_accuracy": 1.0,
+  "checkpoint_path": "models/square_classifier_kaggle.pt",
+  "train_board_count": 80000,
+  "validation_board_count": 10000,
+  "split_manifest": "data/metadata/kaggle_80_10_10.csv",
+  "seed": 42
+}

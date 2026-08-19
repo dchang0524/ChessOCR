@@ -70,6 +70,7 @@ class Trainer:
         label_smoothing: float = DEFAULT_LABEL_SMOOTHING,
         class_names: list[str] | None = None,
         input_size: int = INPUT_SIZE,
+        checkpoint_metadata: dict[str, object] | None = None,
     ) -> None:
         """Initialise the trainer.
 
@@ -83,6 +84,7 @@ class Trainer:
             label_smoothing: Label smoothing for the cross-entropy loss.
             class_names: Class ordering stored in the checkpoint.
             input_size: Square input size stored in the checkpoint.
+            checkpoint_metadata: Additional provenance stored in each checkpoint.
         """
         self.device = device if isinstance(device, torch.device) else resolve_device(device)
         self.model = model.to(self.device)
@@ -93,6 +95,17 @@ class Trainer:
         )
         self.class_names = class_names or list(CLASS_NAMES)
         self.input_size = input_size
+        self.checkpoint_metadata = dict(checkpoint_metadata or {})
+        reserved = {
+            "model_state_dict",
+            "class_names",
+            "input_size",
+            "epoch",
+            "validation_accuracy",
+        }
+        conflicts = reserved.intersection(self.checkpoint_metadata)
+        if conflicts:
+            raise ValueError(f"checkpoint_metadata uses reserved keys: {sorted(conflicts)}")
         self.history = TrainingHistory()
 
     def fit(
@@ -177,6 +190,7 @@ class Trainer:
             "input_size": self.input_size,
             "epoch": epoch,
             "validation_accuracy": validation_accuracy,
+            **self.checkpoint_metadata,
         }
         self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(checkpoint, self.checkpoint_path)
@@ -186,8 +200,8 @@ class Trainer:
     def _run_epoch(self, loader: DataLoader, training: bool) -> tuple[float, float]:
         """Run one pass over ``loader`` and return ``(mean_loss, accuracy)``."""
         self.model.train(training)
-        total_loss = 0.0
-        correct = 0
+        total_loss = torch.zeros((), device=self.device)
+        correct = torch.zeros((), dtype=torch.long, device=self.device)
         seen = 0
 
         with torch.set_grad_enabled(training):
@@ -204,10 +218,10 @@ class Trainer:
                     self.optimizer.step()
 
                 batch_size = labels.size(0)
-                total_loss += float(loss.detach()) * batch_size
-                correct += int((logits.argmax(dim=1) == labels).sum())
+                total_loss += loss.detach() * batch_size
+                correct += (logits.argmax(dim=1) == labels).sum()
                 seen += batch_size
 
         if seen == 0:
             raise ValueError("Data loader produced no samples")
-        return total_loss / seen, correct / seen
+        return float(total_loss.cpu()) / seen, int(correct.cpu()) / seen

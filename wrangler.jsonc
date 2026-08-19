@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "chessocr",
+  "compatibility_date": "2026-08-12",
+  "assets": {
+    "directory": "./web",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "chessocr.junyong.dev",
+      "custom_domain": true
+    }
+  ]
+}

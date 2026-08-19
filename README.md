@@ -54,7 +54,7 @@ Inference runs only when the button is pressed — moving the crop box never tri
 ## Architecture
 
 ```text
-        Streamlit UI (app.py)
+        Browser UI (web/) or Streamlit UI (app.py)
         upload + interactive 1:1 crop + orientation
                     │  cropped PIL image
                     ▼
@@ -205,6 +205,45 @@ boards with 0, 1, 2, or 3+ errors. Misclassified squares are written to `outputs
 Overall square accuracy alone is misleading: empty squares dominate a typical board, so always
 read the occupied-square and board-level numbers next to it.
 
+To benchmark a checkpoint against the external Kaggle chess-positions test split without
+extracting another 1.28 million square images:
+
+```bash
+python scripts/evaluate_kaggle.py \
+  --checkpoint models/square_classifier_2d.pt \
+  --image-dir data/raw/kaggle_chess_positions/test \
+  --board-batch-size 16
+```
+
+The evaluator reads each full board once, applies the production resize/split/normalization path,
+and writes detailed metrics to `outputs/kaggle_evaluation.json` plus a confusion matrix under
+`outputs/confusion_matrices/`. Keep this dataset evaluation-only to preserve it as an external
+generalization benchmark.
+
+For Kaggle training, create a reproducible 80/10/10 manifest without copying the images, then
+fine-tune the existing 2D checkpoint:
+
+```bash
+python scripts/split_kaggle.py --seed 42
+python scripts/train_kaggle.py \
+  --initial-checkpoint models/square_classifier_2d.pt \
+  --checkpoint models/square_classifier_kaggle.pt \
+  --epochs 1 \
+  --board-batch-size 8 \
+  --empty-samples 8
+```
+
+The split preserves the dataset's original 80,000-board training folder and deterministically
+divides the original 20,000-board holdout into 10,000 validation and 10,000 final-test boards.
+Training uses every occupied square plus eight randomly selected empty squares per board and
+applies crop and color augmentation; validation and testing always use all 64 squares.
+
+With split seed 42 and one fine-tuning epoch from `square_classifier_2d.pt`, the Kaggle-trained
+checkpoint classified all 640,000 squares and all 10,000 boards in the final-test manifest
+correctly. Treat this as **Kaggle in-distribution accuracy**, not a claim of perfect real-world
+OCR: the split contains distinct positions but uses the same finite collection of synthetic
+renderer styles across train, validation and test.
+
 ---
 
 ## Running the app
@@ -215,6 +254,41 @@ streamlit run app.py
 
 Point the sidebar at your checkpoint (default `models/square_classifier.pt`), adjust the
 low-confidence threshold (default `0.80`), then upload and crop.
+
+### Browser inference
+
+The static app in `web/` runs the same square classifier locally with ONNX Runtime Web. The
+uploaded screenshot never goes to an inference server. Export the latest checkpoint whenever you
+retrain:
+
+```bash
+python scripts/export_onnx.py \
+  --checkpoint models/square_classifier_kaggle.pt \
+  --output web/model/square_classifier.onnx
+```
+
+Serve the directory over HTTP (opening `index.html` directly will not allow the model fetch):
+
+```bash
+python -m http.server 4173 --directory web
+```
+
+Then open `http://localhost:4173`. The application resizes the selected crop to 512×512, packs
+the 64 RGB squares into one `64×3×64×64` tensor, runs a single ONNX batch in WebAssembly, and
+reconstructs the FEN entirely in JavaScript.
+
+### Deploying to Cloudflare
+
+The checked-in `wrangler.jsonc` serves `web/` as static Worker assets and attaches the Worker to
+`chessocr.junyong.dev`. After authenticating Wrangler, deploy with:
+
+```bash
+npm install
+npm run deploy
+```
+
+Cloudflare creates the custom-domain DNS record and certificate. The ONNX model is a static asset;
+there is no Python server or GPU bill in this deployment.
 
 ---
 

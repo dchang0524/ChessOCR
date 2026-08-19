@@ -16,8 +16,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+import torch  # noqa: E402
 from torch.utils.data import DataLoader  # noqa: E402
 
+from chess_ocr.data.labels import CLASS_NAMES  # noqa: E402
 from chess_ocr.data.square_dataset import (  # noqa: E402
     SquareDataset,
     build_eval_transforms,
@@ -41,6 +43,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=Path("models/square_classifier.pt"),
         help="Where to write the best checkpoint",
+    )
+    parser.add_argument(
+        "--initial-checkpoint",
+        type=Path,
+        default=None,
+        help="Optional checkpoint whose weights are fine-tuned",
     )
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=128)
@@ -97,14 +105,29 @@ def main(argv: list[str] | None = None) -> int:
         num_workers=args.num_workers,
     )
 
+    model = SquareClassifier()
+    initial_checkpoint: str | None = None
+    if args.initial_checkpoint is not None:
+        checkpoint = torch.load(args.initial_checkpoint, map_location="cpu", weights_only=False)
+        if list(checkpoint.get("class_names", CLASS_NAMES)) != CLASS_NAMES:
+            raise ValueError("Initial checkpoint class ordering does not match this project")
+        if int(checkpoint.get("input_size", args.input_size)) != args.input_size:
+            raise ValueError("Initial checkpoint input size does not match --input-size")
+        model.load_state_dict(checkpoint["model_state_dict"])
+        initial_checkpoint = str(args.initial_checkpoint)
+
     trainer = Trainer(
-        model=SquareClassifier(),
+        model=model,
         checkpoint_path=args.checkpoint,
         device=args.device,
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
         label_smoothing=args.label_smoothing,
         input_size=args.input_size,
+        checkpoint_metadata={
+            "training_metadata": str(args.metadata),
+            "initial_checkpoint": initial_checkpoint,
+        },
     )
     history = trainer.fit(train_loader, val_loader, epochs=args.epochs)
 

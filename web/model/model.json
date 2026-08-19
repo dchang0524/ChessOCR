@@ -1,0 +1,55 @@
+{
+  "format": "onnx",
+  "opset": 18,
+  "source_checkpoint": "square_classifier_kaggle.pt",
+  "source_epoch": 1,
+  "source_validation_accuracy": 1.0,
+  "model_path": "square_classifier.onnx",
+  "model_sha256": "dad5c5760392ee42d701f7d94266df67015f84c4ad93a1b1ce78dd33bdf66cd5",
+  "model_bytes": 1190059,
+  "input_name": "squares",
+  "output_name": "logits",
+  "input_size": 64,
+  "class_names": [
+    "empty",
+    "white_pawn",
+    "white_knight",
+    "white_bishop",
+    "white_rook",
+    "white_queen",
+    "white_king",
+    "black_pawn",
+    "black_knight",
+    "black_bishop",
+    "black_rook",
+    "black_queen",
+    "black_king"
+  ],
+  "fen_symbols": [
+    "",
+    "P",
+    "N",
+    "B",
+    "R",
+    "Q",
+    "K",
+    "p",
+    "n",
+    "b",
+    "r",
+    "q",
+    "k"
+  ],
+  "normalization": {
+    "mean": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "std": [
+      0.5,
+      0.5,
+      0.5
+    ]
+  }
+}
