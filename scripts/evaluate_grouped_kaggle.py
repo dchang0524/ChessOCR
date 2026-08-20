@@ -30,6 +30,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--image-dir", type=Path, default=Path("data/raw/kaggle_chess_positions/test")
     )
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=None,
+        help="Optional split manifest; when set, --image-dir is ignored",
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=Path("data/raw/kaggle_chess_positions"),
+    )
+    parser.add_argument("--split", default="test")
     parser.add_argument("--max-boards", type=int, default=None)
     parser.add_argument(
         "--skip-boards",
@@ -102,20 +114,27 @@ def main() -> int:
     )
     classifier_input_size = int(classifier_checkpoint.get("input_size", 64))
     similarity_input_size = int(similarity_checkpoint.get("input_size", 64))
-    dataset = KaggleBoardDataset(
-        image_dir=args.image_dir,
-        max_boards=loaded_maximum,
-        input_size=similarity_input_size,
-    )
+    def build_dataset(input_size: int) -> KaggleBoardDataset:
+        if args.manifest is not None:
+            return KaggleBoardDataset.from_manifest(
+                manifest_csv=args.manifest,
+                data_root=args.data_root,
+                split=args.split,
+                max_boards=loaded_maximum,
+                input_size=input_size,
+            )
+        return KaggleBoardDataset(
+            image_dir=args.image_dir,
+            max_boards=loaded_maximum,
+            input_size=input_size,
+        )
+
+    dataset = build_dataset(similarity_input_size)
     if args.skip_boards:
         dataset.paths = dataset.paths[args.skip_boards :]
         dataset.board_fens = dataset.board_fens[args.skip_boards :]
     classifier_dataset = (
-        KaggleBoardDataset(
-            image_dir=args.image_dir,
-            max_boards=loaded_maximum,
-            input_size=classifier_input_size,
-        )
+        build_dataset(classifier_input_size)
         if classifier_input_size != similarity_input_size
         else dataset
     )
@@ -262,7 +281,9 @@ def main() -> int:
         "classifier_checkpoint": str(args.classifier_checkpoint),
         "similarity_checkpoint": str(args.similarity_checkpoint),
         "training_source": classifier_checkpoint.get("training_metadata"),
-        "evaluation_source": str(args.image_dir),
+        "evaluation_source": (
+            f"{args.manifest}:{args.split}" if args.manifest is not None else str(args.image_dir)
+        ),
         "skip_boards": args.skip_boards,
         "board_count": board_count,
         "elapsed_seconds": elapsed,

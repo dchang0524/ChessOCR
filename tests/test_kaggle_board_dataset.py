@@ -6,6 +6,7 @@ from PIL import Image
 
 from chess_ocr.data.kaggle_board_dataset import (
     KaggleBoardDataset,
+    KaggleBoardPairDataset,
     collate_kaggle_boards,
     fen_from_kaggle_filename,
 )
@@ -47,3 +48,21 @@ def test_invalid_kaggle_filename_is_rejected(tmp_path: Path) -> None:
     Image.new("RGB", (10, 10), color="black").save(tmp_path / "not-a-fen.png")
     with pytest.raises(ValueError, match="Invalid board FEN"):
         KaggleBoardDataset(tmp_path)
+
+
+def test_kaggle_pair_dataset_samples_balanced_joint_batches(tmp_path: Path) -> None:
+    filename = STARTING_FEN.replace("/", "-") + ".png"
+    path = tmp_path / filename
+    Image.new("RGB", (400, 400), color="white").save(path)
+    dataset = KaggleBoardPairDataset([path, path], input_size=28, seed=3)
+
+    positive = dataset[0]
+    negative = dataset[1]
+
+    assert len(positive) == 7
+    assert positive[0].shape == (3, 28, 28)
+    assert positive[1].shape == (3, 28, 28)
+    assert positive[2] == 1.0
+    assert positive[4] == positive[5]
+    assert negative[2] == 0.0
+    assert negative[4] != negative[5]

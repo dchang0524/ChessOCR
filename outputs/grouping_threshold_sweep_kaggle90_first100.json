@@ -1,0 +1,135 @@
+{
+  "checkpoint": "models/joint_dinov2_vits14_kaggle90.pt",
+  "evaluation_source": "data/metadata/kaggle_all_90_10.csv:test",
+  "board_count": 100,
+  "elapsed_seconds": 141.3110383329913,
+  "preprocessing": "whole board resized to 8 * model input, then split",
+  "exact_identical_input_cache": {
+    "requests": 6400,
+    "unique_inputs": 4586,
+    "hit_rate": 0.2834375
+  },
+  "similarity_threshold": 0.14801067113876343,
+  "duplicate_penalty": 1.5,
+  "baseline": {
+    "square_accuracy": 0.99984375,
+    "occupied_accuracy": 0.9989949748743718,
+    "exact_board_accuracy": 0.99
+  },
+  "grouped": {
+    "square_accuracy": 0.99109375,
+    "occupied_accuracy": 0.942713567839196,
+    "exact_board_accuracy": 0.58
+  },
+  "clustering": {
+    "scope": "all_64_squares_including_empty",
+    "false_merge_rate": 0.0006374369491713319,
+    "false_split_rate": 0.0,
+    "predicted_merged_pairs": 144328,
+    "true_same_pairs": 144236,
+    "cross_background_false_merge_rate": 0.0005591315732053241,
+    "cross_background_false_split_rate": 0.0,
+    "cross_background_predicted_merged_pairs": 73328,
+    "cross_background_true_same_pairs": 73287
+  },
+  "threshold_sweep": [
+    {
+      "similarity_threshold": 0.15,
+      "square_accuracy": 0.9915625,
+      "occupied_accuracy": 0.9457286432160804,
+      "exact_board_accuracy": 0.61,
+      "mean_group_count": 7.86
+    },
+    {
+      "similarity_threshold": 0.3,
+      "square_accuracy": 0.9996875,
+      "occupied_accuracy": 0.9979899497487437,
+      "exact_board_accuracy": 0.98,
+      "mean_group_count": 8.33
+    },
+    {
+      "similarity_threshold": 0.5,
+      "square_accuracy": 0.99984375,
+      "occupied_accuracy": 0.9989949748743718,
+      "exact_board_accuracy": 0.99,
+      "mean_group_count": 8.34
+    },
+    {
+      "similarity_threshold": 0.7,
+      "square_accuracy": 0.99984375,
+      "occupied_accuracy": 0.9989949748743718,
+      "exact_board_accuracy": 0.99,
+      "mean_group_count": 8.34
+    },
+    {
+      "similarity_threshold": 0.8,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.35
+    },
+    {
+      "similarity_threshold": 0.9,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.35
+    },
+    {
+      "similarity_threshold": 0.95,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.35
+    },
+    {
+      "similarity_threshold": 0.98,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.35
+    },
+    {
+      "similarity_threshold": 0.99,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.36
+    },
+    {
+      "similarity_threshold": 0.995,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.4
+    },
+    {
+      "similarity_threshold": 0.999,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.66
+    },
+    {
+      "similarity_threshold": 0.9995,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.9
+    },
+    {
+      "similarity_threshold": 0.9999,
+      "square_accuracy": 0.9996875,
+      "occupied_accuracy": 0.9979899497487437,
+      "exact_board_accuracy": 0.98,
+      "mean_group_count": 10.48
+    },
+    {
+      "similarity_threshold": 1.0,
+      "square_accuracy": 0.99953125,
+      "occupied_accuracy": 0.9969849246231156,
+      "exact_board_accuracy": 0.97,
+      "mean_group_count": 61.48
+    }
+  ]
+}
