@@ -1,0 +1,19 @@
+{
+  "epochs": [
+    {
+      "epoch": 1,
+      "train_loss": 1.277462481021881,
+      "train_class_accuracy": 0.65,
+      "train_pair_accuracy": 0.87,
+      "train_consistency_loss": 0.09685053899884224,
+      "val_loss": 0.7095014617443085,
+      "val_class_accuracy": 0.94,
+      "val_pair_accuracy": 0.824,
+      "val_consistency_loss": 0.04435382167994976,
+      "seconds": 36.75669837510213
+    }
+  ],
+  "best_epoch": 1,
+  "best_val_class_accuracy": 0.94,
+  "checkpoint_path": "models/joint_dinov2_vits14_head.pt"
+}

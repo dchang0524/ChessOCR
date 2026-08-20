@@ -1,7 +1,7 @@
 # Piece sprite themes
 
-Five open-license 2D sets are bundled: `chessnut`, `fantasy`, `spatial`, `celtic`, and
-`rhosgfx`. Their provenance and licenses are recorded in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+Six open-license 2D sets are bundled: `chessnut`, `fantasy`, `spatial`, `celtic`, `rhosgfx`, and
+`kiwen-suwi`. Their provenance and licenses are recorded in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
 Regenerate the PNGs from the pinned upstream SVGs with:
 
 ```bash
@@ -14,12 +14,12 @@ Render every bundled set on the classic, green, and blue board palettes:
 python scripts/generate_dataset.py \
   --positions 400 \
   --no-synthetic-themes \
-  --sprite-sets chessnut fantasy spatial celtic rhosgfx \
+  --sprite-sets chessnut fantasy spatial celtic rhosgfx kiwen-suwi \
   --board-palettes classic green blue \
-  --output-dir data/processed/sprites_v1
+  --output-dir data/processed/sprites_v4_curated_themes
 ```
 
-This produces 15 visual themes. Palette/set combinations are intentional: they prevent the
+This produces 18 visual themes. Palette/set combinations are intentional: they prevent the
 classifier from learning a false association between one piece style and one board colour.
 The generator also applies up to 6 pixels of full-board crop jitter to 80% of renders by default,
 so all 64 square boundaries shift together as they would after an imperfect manual crop.

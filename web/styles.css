@@ -151,6 +151,50 @@ select { padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px
 .board-square { cursor: pointer; }
 .board-square.selected-group { box-shadow: inset 0 0 0 3px #58c4dc; }
 .board-square.selected-square { box-shadow: inset 0 0 0 4px #f6c453; }
+.group-browser { margin-top: 24px; }
+.group-browser-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.group-summary { margin: -4px 0 0; color: var(--muted); font-size: .86rem; }
+.group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+  margin-top: 13px;
+}
+.group-tile {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text);
+  background: #0b111b;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s, background .16s, transform .16s;
+}
+.group-tile:hover { border-color: #59657b; background: #111927; transform: translateY(-1px); }
+.group-tile.active { border-color: #58c4dc; background: rgba(88, 196, 220, .11); box-shadow: 0 0 0 1px rgba(88, 196, 220, .2); }
+.group-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #3a4559;
+  border-radius: 9px;
+  background: #171e2b;
+  font-size: 1.85rem;
+  line-height: 1;
+}
+.group-icon.white-piece { color: #fff8e8; text-shadow: 0 1px 2px #111820; }
+.group-icon.black-piece { color: #171a20; background: #aeb5c1; text-shadow: 0 1px 1px rgba(255,255,255,.3); }
+.group-icon.empty-group { color: #8f9aad; font-size: 1.25rem; }
+.group-details { min-width: 0; }
+.group-details strong, .group-details span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-details strong { font-size: .82rem; }
+.group-details span { margin-top: 3px; color: var(--muted); font-size: .72rem; }
 .correction-panel { margin-top: 22px; padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: #0b111b; }
 .correction-panel p { margin: 0 0 12px; }
 .correction-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; gap: 10px; align-items: center; }

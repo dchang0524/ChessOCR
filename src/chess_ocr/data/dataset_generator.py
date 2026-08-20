@@ -24,6 +24,7 @@ rendered boards from the themes you care about.
 from __future__ import annotations
 
 import csv
+import colorsys
 import random
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
@@ -55,6 +56,7 @@ METADATA_FIELDS = (
     "square",
     "theme",
     "square_color",
+    "background_varied",
     "split",
 )
 
@@ -114,9 +116,96 @@ class BoardTheme(Protocol):
 
     name: str
 
-    def render_board(self, board_fen: str, size: int) -> Image.Image:
+    def render_board(
+        self,
+        board_fen: str,
+        size: int,
+        background_rng: random.Random | None = None,
+        background_variation_strength: float = 0.0,
+    ) -> Image.Image:
         """Render ``board_fen`` as an RGB image of ``size`` x ``size`` pixels."""
         ...
+
+
+def _blend_rgb(
+    base: tuple[int, int, int], target: tuple[int, int, int], amount: float
+) -> tuple[int, int, int]:
+    """Linearly blend two RGB colours."""
+    return tuple(round(a + (b - a) * amount) for a, b in zip(base, target, strict=True))
+
+
+def _hsv_rgb(hue: float, saturation: float, value: float) -> tuple[int, int, int]:
+    """Convert normalized HSV values to an 8-bit RGB tuple."""
+    red, green, blue = colorsys.hsv_to_rgb(hue % 1.0, saturation, value)
+    return round(red * 255), round(green * 255), round(blue * 255)
+
+
+def render_square_backgrounds(
+    size: int,
+    light_rgb: tuple[int, int, int],
+    dark_rgb: tuple[int, int, int],
+    rng: random.Random | None = None,
+    strength: float = 0.0,
+) -> Image.Image:
+    """Render board-square backgrounds without touching the piece layer.
+
+    When ``rng`` is supplied, a coherent random palette plus subtle gradients,
+    texture, and borders are applied. Pieces are composited only after this
+    function returns, so none of these chromatic changes affect sprite pixels.
+    """
+    if not 0.0 <= strength <= 1.0:
+        raise ValueError("background variation strength must be in [0, 1]")
+    edges = [round(index * size / BOARD_SIDE) for index in range(BOARD_SIDE + 1)]
+    light, dark = light_rgb, dark_rgb
+    if rng is not None and strength > 0:
+        hue = rng.random()
+        target_light = _hsv_rgb(hue, rng.uniform(0.05, 0.45), rng.uniform(0.75, 0.98))
+        target_dark = _hsv_rgb(
+            hue + rng.uniform(-0.06, 0.06),
+            rng.uniform(0.18, 0.78),
+            rng.uniform(0.28, 0.68),
+        )
+        palette_amount = rng.uniform(0.35, 0.9) * strength
+        light = _blend_rgb(light, target_light, palette_amount)
+        dark = _blend_rgb(dark, target_dark, palette_amount)
+
+    background = Image.new("RGB", (size, size))
+    draw = ImageDraw.Draw(background)
+    gradient_amount = 0 if rng is None else round(rng.uniform(0, 24) * strength)
+    horizontal_gradient = bool(rng and rng.random() < 0.5)
+    for index in range(BOARD_SIDE * BOARD_SIDE):
+        row, column = divmod(index, BOARD_SIDE)
+        box = (edges[column], edges[row], edges[column + 1], edges[row + 1])
+        base = light if square_color(index) == "light" else dark
+        if gradient_amount == 0:
+            draw.rectangle(box, fill=base)
+            continue
+        steps = (box[2] - box[0]) if horizontal_gradient else (box[3] - box[1])
+        for step in range(max(1, steps)):
+            centered = step / max(1, steps - 1) - 0.5
+            delta = round(centered * gradient_amount)
+            colour = tuple(max(0, min(255, channel + delta)) for channel in base)
+            if horizontal_gradient:
+                draw.line((box[0] + step, box[1], box[0] + step, box[3]), fill=colour)
+            else:
+                draw.line((box[0], box[1] + step, box[2], box[1] + step), fill=colour)
+
+    if rng is not None and strength > 0:
+        # Deterministic low-frequency texture, generated before piece compositing.
+        texture_size = 32
+        texture = Image.new("L", (texture_size, texture_size))
+        texture.putdata([rng.randint(80, 176) for _ in range(texture_size**2)])
+        texture = texture.resize((size, size), Image.Resampling.BICUBIC).convert("RGB")
+        background = Image.blend(background, texture, rng.uniform(0.0, 0.10) * strength)
+        border_alpha = rng.uniform(0.0, 0.35) * strength
+        if border_alpha > 0.03:
+            draw = ImageDraw.Draw(background, "RGBA")
+            border = (255, 255, 255, round(80 * border_alpha))
+            width = max(1, round(size / 512))
+            for edge in edges:
+                draw.line((edge, 0, edge, size), fill=border, width=width)
+                draw.line((0, edge, size, edge), fill=border, width=width)
+    return background
 
 
 @dataclass
@@ -139,7 +228,13 @@ class SyntheticBoardTheme:
     black_piece_rgb: tuple[int, int, int] = (30, 30, 30)
     piece_scale: float = 0.78
 
-    def render_board(self, board_fen: str, size: int = DEFAULT_BOARD_SIZE) -> Image.Image:
+    def render_board(
+        self,
+        board_fen: str,
+        size: int = DEFAULT_BOARD_SIZE,
+        background_rng: random.Random | None = None,
+        background_variation_strength: float = 0.0,
+    ) -> Image.Image:
         """Render ``board_fen`` with White at the bottom.
 
         Args:
@@ -149,8 +244,15 @@ class SyntheticBoardTheme:
         Returns:
             An RGB board image.
         """
-        board = Image.new("RGB", (size, size))
-        draw = ImageDraw.Draw(board)
+        board = render_square_backgrounds(
+            size,
+            self.light_rgb,
+            self.dark_rgb,
+            background_rng,
+            background_variation_strength,
+        ).convert("RGBA")
+        piece_layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(piece_layer)
         edges = [round(index * size / BOARD_SIDE) for index in range(BOARD_SIDE + 1)]
         class_ids = board_fen_to_class_ids(board_fen)
         square_pixels = max(1, size // BOARD_SIDE)
@@ -159,14 +261,11 @@ class SyntheticBoardTheme:
         for index, class_id in enumerate(class_ids):
             row, column = divmod(index, BOARD_SIDE)
             box = (edges[column], edges[row], edges[column + 1], edges[row + 1])
-            is_light = square_color(index) == "light"
-            draw.rectangle(box, fill=self.light_rgb if is_light else self.dark_rgb)
-
             symbol = CLASS_ID_TO_FEN[class_id]
             if not symbol:
                 continue
             self._draw_piece(draw, box, symbol, font)
-        return board
+        return Image.alpha_composite(board, piece_layer).convert("RGB")
 
     def _draw_piece(
         self,
@@ -274,7 +373,13 @@ class ImageAssetBoardTheme:
     piece_scale: float = 0.92
     _cache: dict[str, Image.Image] = field(default_factory=dict, repr=False)
 
-    def render_board(self, board_fen: str, size: int = DEFAULT_BOARD_SIZE) -> Image.Image:
+    def render_board(
+        self,
+        board_fen: str,
+        size: int = DEFAULT_BOARD_SIZE,
+        background_rng: random.Random | None = None,
+        background_variation_strength: float = 0.0,
+    ) -> Image.Image:
         """Render ``board_fen`` with White at the bottom using the sprite set.
 
         Args:
@@ -287,17 +392,20 @@ class ImageAssetBoardTheme:
         Raises:
             FileNotFoundError: If a required sprite is missing.
         """
-        board = Image.new("RGB", (size, size))
-        draw = ImageDraw.Draw(board)
+        board = render_square_backgrounds(
+            size,
+            self.light_rgb,
+            self.dark_rgb,
+            background_rng,
+            background_variation_strength,
+        ).convert("RGBA")
+        piece_layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         edges = [round(index * size / BOARD_SIDE) for index in range(BOARD_SIDE + 1)]
         class_ids = board_fen_to_class_ids(board_fen)
 
         for index, class_id in enumerate(class_ids):
             row, column = divmod(index, BOARD_SIDE)
             box = (edges[column], edges[row], edges[column + 1], edges[row + 1])
-            is_light = square_color(index) == "light"
-            draw.rectangle(box, fill=self.light_rgb if is_light else self.dark_rgb)
-
             symbol = CLASS_ID_TO_FEN[class_id]
             if not symbol:
                 continue
@@ -310,8 +418,8 @@ class ImageAssetBoardTheme:
                 box[0] + (square_size - sprite_size) // 2,
                 box[1] + (box[3] - box[1] - sprite_size) // 2,
             )
-            board.paste(sprite, offset, sprite)
-        return board
+            piece_layer.alpha_composite(sprite, dest=offset)
+        return Image.alpha_composite(board, piece_layer).convert("RGB")
 
     def _load_sprite(self, symbol: str) -> Image.Image:
         """Load and cache the RGBA sprite for a FEN piece symbol."""
@@ -341,6 +449,10 @@ class GenerationConfig:
         crop_jitter_pixels: Maximum pixels independently added to or trimmed
             from each board edge before the board is resized and split.
         crop_jitter_probability: Share of rendered boards receiving crop jitter.
+        background_variation_probability: Share of training boards receiving
+            background-only palette, gradient, texture, and border variation.
+        background_variation_strength: Maximum intensity of background-only
+            variation, in ``[0, 1]``.
     """
 
     output_dir: Path
@@ -351,6 +463,8 @@ class GenerationConfig:
     seed: int = 0
     crop_jitter_pixels: int = 6
     crop_jitter_probability: float = 0.8
+    background_variation_probability: float = 1.0
+    background_variation_strength: float = 0.75
 
     def __post_init__(self) -> None:
         if not 0 < self.train_fraction < 1:
@@ -363,6 +477,10 @@ class GenerationConfig:
             raise ValueError("crop_jitter_pixels must be non-negative")
         if not 0.0 <= self.crop_jitter_probability <= 1.0:
             raise ValueError("crop_jitter_probability must be in [0, 1]")
+        if not 0.0 <= self.background_variation_probability <= 1.0:
+            raise ValueError("background_variation_probability must be in [0, 1]")
+        if not 0.0 <= self.background_variation_strength <= 1.0:
+            raise ValueError("background_variation_strength must be in [0, 1]")
 
 
 def jitter_board_crop(
@@ -473,7 +591,20 @@ class DatasetGenerator:
             class_ids = board_fen_to_class_ids(board_fen)
 
             for theme in self.themes:
-                board = theme.render_board(board_fen, self.config.board_size)
+                background_varied = (
+                    split == "train"
+                    and self.config.background_variation_strength > 0
+                    and augmentation_rng.random()
+                    < self.config.background_variation_probability
+                )
+                board = theme.render_board(
+                    board_fen,
+                    self.config.board_size,
+                    background_rng=augmentation_rng if background_varied else None,
+                    background_variation_strength=(
+                        self.config.background_variation_strength if background_varied else 0.0
+                    ),
+                )
                 if (
                     self.config.crop_jitter_pixels > 0
                     and augmentation_rng.random() < self.config.crop_jitter_probability
@@ -508,6 +639,7 @@ class DatasetGenerator:
                             "square": SQUARE_NAMES[index],
                             "theme": theme.name,
                             "square_color": square_color(index),
+                            "background_varied": background_varied,
                             "split": split,
                         }
                     )

@@ -1,0 +1,28 @@
+{
+  "classifier_checkpoint": "models/square_classifier_background_aug.pt",
+  "similarity_checkpoint": "models/similarity_background_aug_weighted_high_lr.pt",
+  "training_source": "data/processed/sprites_v2_background_aug/metadata.csv",
+  "evaluation_source": "data/raw/kaggle_chess_positions/test",
+  "skip_boards": 0,
+  "board_count": 50,
+  "elapsed_seconds": 12.629034749930725,
+  "similarity_threshold": 0.98,
+  "duplicate_penalty": 1.5,
+  "baseline": {
+    "square_accuracy": 0.8790625,
+    "occupied_accuracy": 0.542608695652174,
+    "exact_board_accuracy": 0.0
+  },
+  "grouped": {
+    "square_accuracy": 0.9128125,
+    "occupied_accuracy": 0.6260869565217392,
+    "exact_board_accuracy": 0.0
+  },
+  "clustering": {
+    "scope": "all_64_squares_including_empty",
+    "false_merge_rate": 0.002477345328900189,
+    "false_split_rate": 0.5501954904900491,
+    "predicted_merged_pairs": 30678,
+    "true_same_pairs": 68034
+  }
+}

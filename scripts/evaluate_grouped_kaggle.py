@@ -15,12 +15,12 @@ import torch  # noqa: E402
 from torch.utils.data import DataLoader  # noqa: E402
 
 from chess_ocr.data.kaggle_board_dataset import KaggleBoardDataset  # noqa: E402
-from chess_ocr.data.labels import CLASS_NAMES, CLASS_NAME_TO_ID  # noqa: E402
+from chess_ocr.data.labels import CLASS_NAME_TO_ID, CLASS_NAMES  # noqa: E402
 from chess_ocr.inference.board_predictor import resolve_device  # noqa: E402
 from chess_ocr.inference.group_label_assigner import GroupLabelAssigner  # noqa: E402
 from chess_ocr.inference.piece_clusterer import PieceClusterer  # noqa: E402
-from chess_ocr.models.similarity_classifier import SimilarityClassifier  # noqa: E402
-from chess_ocr.models.square_classifier import SquareClassifier  # noqa: E402
+from chess_ocr.models.similarity_classifier import similarity_model_from_checkpoint  # noqa: E402
+from chess_ocr.models.square_classifier import square_classifier_from_checkpoint  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,6 +38,12 @@ def parse_args() -> argparse.Namespace:
         help="Skip a deterministic sorted prefix, e.g. a threshold-calibration slice",
     )
     parser.add_argument("--board-batch-size", type=int, default=8)
+    parser.add_argument(
+        "--square-batch-size",
+        type=int,
+        default=512,
+        help="Bound per-forward-pass square count for transformer memory use",
+    )
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", choices=["cpu", "cuda", "mps"], default=None)
     parser.add_argument("--duplicate-penalty", type=float, default=1.5)
@@ -46,6 +52,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=None,
         help="Optional clustering-threshold override for evaluation sweeps",
+    )
+    parser.add_argument(
+        "--cross-background-similarity-threshold",
+        type=float,
+        default=None,
+        help="Optional lower cutoff used only between light- and dark-square embeddings",
     )
     parser.add_argument(
         "--output", type=Path, default=Path("outputs/grouped_kaggle_evaluation.json")
@@ -67,38 +79,75 @@ def main() -> int:
         args.similarity_checkpoint, map_location=device, weights_only=False
     )
     class_names = list(classifier_checkpoint.get("class_names", CLASS_NAMES))
-    classifier = SquareClassifier(len(class_names)).to(device)
+    classifier = square_classifier_from_checkpoint(classifier_checkpoint).to(device)
     classifier.load_state_dict(classifier_checkpoint["model_state_dict"])
     classifier.eval()
-    similarity = SimilarityClassifier(int(similarity_checkpoint.get("embedding_size", 64))).to(
-        device
+    shared_joint_model = (
+        args.classifier_checkpoint.resolve() == args.similarity_checkpoint.resolve()
+        and classifier_checkpoint.get("architecture") == "dinov2_vits14_joint"
     )
-    similarity.load_state_dict(similarity_checkpoint["model_state_dict"])
-    similarity.eval()
+    if shared_joint_model:
+        similarity = classifier
+    else:
+        similarity = similarity_model_from_checkpoint(similarity_checkpoint).to(device)
+        similarity.load_state_dict(similarity_checkpoint["model_state_dict"])
+        similarity.eval()
 
     if args.skip_boards < 0:
         raise ValueError("--skip-boards must be non-negative")
+    if args.square_batch_size <= 0:
+        raise ValueError("--square-batch-size must be positive")
     loaded_maximum = (
         args.skip_boards + args.max_boards if args.max_boards is not None else None
     )
+    classifier_input_size = int(classifier_checkpoint.get("input_size", 64))
+    similarity_input_size = int(similarity_checkpoint.get("input_size", 64))
     dataset = KaggleBoardDataset(
         image_dir=args.image_dir,
         max_boards=loaded_maximum,
-        input_size=int(classifier_checkpoint.get("input_size", 64)),
+        input_size=similarity_input_size,
     )
     if args.skip_boards:
         dataset.paths = dataset.paths[args.skip_boards :]
         dataset.board_fens = dataset.board_fens[args.skip_boards :]
+    classifier_dataset = (
+        KaggleBoardDataset(
+            image_dir=args.image_dir,
+            max_boards=loaded_maximum,
+            input_size=classifier_input_size,
+        )
+        if classifier_input_size != similarity_input_size
+        else dataset
+    )
+    if args.skip_boards and classifier_dataset is not dataset:
+        classifier_dataset.paths = classifier_dataset.paths[args.skip_boards :]
+        classifier_dataset.board_fens = classifier_dataset.board_fens[args.skip_boards :]
     loader = DataLoader(
         dataset,
         batch_size=args.board_batch_size,
         shuffle=False,
         num_workers=args.num_workers,
     )
+    classifier_loader = (
+        DataLoader(
+            classifier_dataset,
+            batch_size=args.board_batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+        )
+        if classifier_dataset is not dataset
+        else loader
+    )
+    batches = (
+        zip(loader, classifier_loader, strict=True)
+        if classifier_dataset is not dataset
+        else ((batch, batch) for batch in loader)
+    )
     clusterer = PieceClusterer(
         float(similarity_checkpoint["similarity_threshold"])
         if args.similarity_threshold is None
-        else args.similarity_threshold
+        else args.similarity_threshold,
+        args.cross_background_similarity_threshold,
     )
     assigner = GroupLabelAssigner(args.duplicate_penalty, class_names)
     empty_id = CLASS_NAME_TO_ID["empty"]
@@ -115,14 +164,47 @@ def main() -> int:
     predicted_merged_pairs = 0
     false_split_pairs = 0
     true_same_pairs = 0
+    cross_background_false_merge_pairs = 0
+    cross_background_predicted_merged_pairs = 0
+    cross_background_false_split_pairs = 0
+    cross_background_true_same_pairs = 0
     started = time.perf_counter()
 
     with torch.no_grad():
-        for squares, labels, _ in loader:
+        for similarity_batch, classifier_batch in batches:
+            squares, labels, board_ids = similarity_batch
+            classifier_squares, classifier_labels, classifier_board_ids = classifier_batch
+            if list(board_ids) != list(classifier_board_ids) or not torch.equal(
+                labels, classifier_labels
+            ):
+                raise RuntimeError("Mixed-resolution Kaggle loaders are not aligned")
             batch_size = squares.shape[0]
             flat_squares = squares.flatten(0, 1).to(device)
-            logits = classifier(flat_squares).reshape(batch_size, 64, -1).cpu()
-            embeddings = similarity.encode(flat_squares).reshape(batch_size, 64, -1).cpu()
+            flat_classifier_squares = classifier_squares.flatten(0, 1).to(device)
+            if shared_joint_model:
+                joint_outputs = [
+                    classifier.classify_and_encode(chunk)
+                    for chunk in flat_classifier_squares.split(args.square_batch_size)
+                ]
+                flat_logits = torch.cat([output[0] for output in joint_outputs])
+                flat_embeddings = torch.cat([output[1] for output in joint_outputs])
+                logits = flat_logits.reshape(batch_size, 64, -1).cpu()
+                embeddings = flat_embeddings.reshape(batch_size, 64, -1).cpu()
+            else:
+                flat_logits = torch.cat(
+                    [
+                        classifier(chunk)
+                        for chunk in flat_classifier_squares.split(args.square_batch_size)
+                    ]
+                )
+                flat_embeddings = torch.cat(
+                    [
+                        similarity.encode(chunk)
+                        for chunk in flat_squares.split(args.square_batch_size)
+                    ]
+                )
+                logits = flat_logits.reshape(batch_size, 64, -1).cpu()
+                embeddings = flat_embeddings.reshape(batch_size, 64, -1).cpu()
             labels = labels.cpu()
 
             for board_index in range(batch_size):
@@ -157,12 +239,22 @@ def main() -> int:
                 for first, second in combinations(square_indices, 2):
                     predicted_same = group_by_square[first] == group_by_square[second]
                     true_same = int(board_labels[first]) == int(board_labels[second])
+                    cross_background = (
+                        (first // 8 + first % 8) % 2
+                        != (second // 8 + second % 8) % 2
+                    )
                     if predicted_same:
                         predicted_merged_pairs += 1
                         false_merge_pairs += int(not true_same)
+                        if cross_background:
+                            cross_background_predicted_merged_pairs += 1
+                            cross_background_false_merge_pairs += int(not true_same)
                     if true_same:
                         true_same_pairs += 1
                         false_split_pairs += int(not predicted_same)
+                        if cross_background:
+                            cross_background_true_same_pairs += 1
+                            cross_background_false_split_pairs += int(not predicted_same)
 
     elapsed = time.perf_counter() - started
     board_count = len(dataset)
@@ -175,6 +267,9 @@ def main() -> int:
         "board_count": board_count,
         "elapsed_seconds": elapsed,
         "similarity_threshold": clusterer.similarity_threshold,
+        "cross_background_similarity_threshold": (
+            clusterer.cross_background_similarity_threshold
+        ),
         "duplicate_penalty": args.duplicate_penalty,
         "baseline": {
             "square_accuracy": safe_ratio(baseline_correct, square_count),
@@ -192,6 +287,18 @@ def main() -> int:
             "false_split_rate": safe_ratio(false_split_pairs, true_same_pairs),
             "predicted_merged_pairs": predicted_merged_pairs,
             "true_same_pairs": true_same_pairs,
+            "cross_background_false_merge_rate": safe_ratio(
+                cross_background_false_merge_pairs,
+                cross_background_predicted_merged_pairs,
+            ),
+            "cross_background_false_split_rate": safe_ratio(
+                cross_background_false_split_pairs,
+                cross_background_true_same_pairs,
+            ),
+            "cross_background_predicted_merged_pairs": (
+                cross_background_predicted_merged_pairs
+            ),
+            "cross_background_true_same_pairs": cross_background_true_same_pairs,
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)

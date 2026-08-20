@@ -17,7 +17,6 @@ import resvg_py
 from PIL import Image
 
 LILA_COMMIT = "cf0c9f3e45415135f3e2261b4ef8c9b2cf5631c1"
-LILA_RAW_BASE = f"https://raw.githubusercontent.com/lichess-org/lila/{LILA_COMMIT}"
 PIECE_NAMES = tuple(f"{colour}{piece}" for colour in "wb" for piece in "PNBRQK")
 
 
@@ -69,6 +68,13 @@ SPRITE_SETS = {
         license_name="CC0 1.0 Universal",
         license_url="https://creativecommons.org/publicdomain/zero/1.0/",
     ),
+    "kiwen-suwi": SpriteSet(
+        source_directory="kiwen-suwi",
+        author="neverRare",
+        license_name="CC BY 4.0",
+        license_url="https://creativecommons.org/licenses/by/4.0/",
+        license_file_url="https://creativecommons.org/licenses/by/4.0/legalcode.txt",
+    ),
 }
 
 
@@ -105,7 +111,11 @@ def import_set(name: str, sprite_set: SpriteSet, output_root: Path, size: int) -
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for piece_name in PIECE_NAMES:
-        source_url = f"{LILA_RAW_BASE}/public/piece/{sprite_set.source_directory}/{piece_name}.svg"
+        source_url = (
+            "https://raw.githubusercontent.com/lichess-org/lila/"
+            f"{LILA_COMMIT}/public/piece/"
+            f"{sprite_set.source_directory}/{piece_name}.svg"
+        )
         svg = download(source_url).decode("utf-8")
         root_end = svg.index(">")
         root = re.sub(r'\s(?:width|height)="[^"]*"', "", svg[:root_end])

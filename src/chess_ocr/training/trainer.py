@@ -102,6 +102,7 @@ class Trainer:
             "input_size",
             "epoch",
             "validation_accuracy",
+            "architecture",
         }
         conflicts = reserved.intersection(self.checkpoint_metadata)
         if conflicts:
@@ -188,6 +189,7 @@ class Trainer:
             "model_state_dict": self.model.state_dict(),
             "class_names": self.class_names,
             "input_size": self.input_size,
+            "architecture": str(getattr(self.model, "architecture", "compact")),
             "epoch": epoch,
             "validation_accuracy": validation_accuracy,
             **self.checkpoint_metadata,

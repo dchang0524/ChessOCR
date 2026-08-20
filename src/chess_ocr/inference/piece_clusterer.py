@@ -33,10 +33,20 @@ class PieceClusterer:
     merges because group-wide user corrections make false merges more harmful.
     """
 
-    def __init__(self, similarity_threshold: float) -> None:
+    def __init__(
+        self,
+        similarity_threshold: float,
+        cross_background_similarity_threshold: float | None = None,
+    ) -> None:
         if not -1.0 <= similarity_threshold <= 1.0:
             raise ValueError("similarity_threshold must be in [-1, 1]")
+        if (
+            cross_background_similarity_threshold is not None
+            and not -1.0 <= cross_background_similarity_threshold <= 1.0
+        ):
+            raise ValueError("cross_background_similarity_threshold must be in [-1, 1]")
         self.similarity_threshold = similarity_threshold
+        self.cross_background_similarity_threshold = cross_background_similarity_threshold
 
     def cluster(
         self, embeddings: torch.Tensor, square_indices: list[int] | tuple[int, ...] | None = None
@@ -55,6 +65,17 @@ class PieceClusterer:
         similarities = normalised @ normalised.T
         working: list[list[int]] = [[index] for index in range(count)]
         linkage = similarities.clone()
+        if self.cross_background_similarity_threshold is not None:
+            boost = self.similarity_threshold - self.cross_background_similarity_threshold
+            for left in range(count):
+                left_index = indices[left]
+                left_colour = (left_index // 8 + left_index % 8) % 2
+                for right in range(left + 1, count):
+                    right_index = indices[right]
+                    right_colour = (right_index // 8 + right_index % 8) % 2
+                    if left_colour != right_colour:
+                        linkage[left, right] += boost
+                        linkage[right, left] += boost
         linkage.fill_diagonal_(-float("inf"))
 
         while len(working) > 1:

@@ -40,6 +40,17 @@ test("complete linkage groups matching embeddings", () => {
   assert.deepEqual(groups.map((group) => group.squareIndices), [[2, 7], [11]]);
 });
 
+test("cross-background threshold only relaxes opposite-colour square pairs", () => {
+  const similarities = [
+    [1, 0.95, 0.95],
+    [0.95, 1, 0.2],
+    [0.95, 0.2, 1],
+  ];
+  // a8 (0) and b8 (1) have opposite backgrounds; a8 and c8 (2) do not.
+  const groups = completeLinkageClusters(similarities, [0, 1, 2], 0.98, 0.94);
+  assert.deepEqual(groups.map((group) => group.squareIndices), [[0, 1], [2]]);
+});
+
 test("joint assignment gives a weaker group its second choice", () => {
   const logits = Array.from({ length: 3 }, () => Array(13).fill(-10));
   logits[0][1] = 4;

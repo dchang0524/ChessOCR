@@ -15,7 +15,6 @@ from torch import nn
 from chess_ocr.chess.fen_builder import FenBuilder
 from chess_ocr.data.labels import (
     CLASS_NAMES,
-    CLASS_NAME_TO_ID,
     SQUARE_NAME_TO_INDEX,
     class_id_to_fen,
     class_id_to_name,
@@ -30,8 +29,8 @@ from chess_ocr.inference.prediction_result import (
     PieceGroupPrediction,
     SquarePrediction,
 )
-from chess_ocr.models.similarity_classifier import SimilarityClassifier
-from chess_ocr.models.square_classifier import SquareClassifier
+from chess_ocr.models.similarity_classifier import similarity_model_from_checkpoint
+from chess_ocr.models.square_classifier import square_classifier_from_checkpoint
 from chess_ocr.preprocessing.board_normalizer import BoardNormalizer
 from chess_ocr.preprocessing.board_splitter import BoardSplitter
 
@@ -70,7 +69,7 @@ class BoardPredictor:
         low_confidence_threshold: float = DEFAULT_LOW_CONFIDENCE_THRESHOLD,
         class_names: list[str] | None = None,
         input_size: int = INPUT_SIZE,
-        similarity_model: SimilarityClassifier | None = None,
+        similarity_model: nn.Module | None = None,
         similarity_threshold: float = 0.5,
         duplicate_penalty: float = 1.5,
     ) -> None:
@@ -85,6 +84,9 @@ class BoardPredictor:
             class_names: Class ordering the model was trained with. Defaults to
                 :data:`chess_ocr.data.labels.CLASS_NAMES`.
             input_size: Side length of the square tensors fed to the model.
+            similarity_model: Optional encoder used for appearance grouping.
+            similarity_threshold: Minimum cosine similarity used for grouping.
+            duplicate_penalty: Global label-assignment penalty for repeated labels.
 
         Raises:
             ValueError: If ``low_confidence_threshold`` is outside ``[0, 1]``.
@@ -139,12 +141,12 @@ class BoardPredictor:
 
         class_names = list(checkpoint.get("class_names", CLASS_NAMES))
         input_size = int(checkpoint.get("input_size", INPUT_SIZE))
-        model = SquareClassifier(num_classes=len(class_names))
+        model = square_classifier_from_checkpoint(checkpoint)
         model.load_state_dict(checkpoint["model_state_dict"])
         model.to(torch_device)
         model.eval()
 
-        return cls(
+        predictor = cls(
             model=model,
             normalizer=BoardNormalizer(),
             splitter=BoardSplitter(),
@@ -153,6 +155,17 @@ class BoardPredictor:
             class_names=class_names,
             input_size=input_size,
         )
+        if checkpoint.get("architecture") == "dinov2_vits14_joint":
+            predictor.similarity_model = model
+            predictor.clusterer = PieceClusterer(
+                float(checkpoint.get("similarity_threshold", 0.5)),
+                (
+                    float(checkpoint["cross_background_similarity_threshold"])
+                    if checkpoint.get("cross_background_similarity_threshold") is not None
+                    else None
+                ),
+            )
+        return predictor
 
     @classmethod
     def from_checkpoints(
@@ -175,12 +188,21 @@ class BoardPredictor:
         checkpoint = torch.load(path, map_location=predictor.device, weights_only=False)
         if "model_state_dict" not in checkpoint:
             raise KeyError(f"Checkpoint {path} does not contain a 'model_state_dict' entry")
-        similarity_model = SimilarityClassifier(int(checkpoint.get("embedding_size", 64)))
-        similarity_model.load_state_dict(checkpoint["model_state_dict"])
-        similarity_model.to(predictor.device).eval()
+        same_checkpoint = Path(classifier_checkpoint_path).resolve() == path.resolve()
+        if same_checkpoint and checkpoint.get("architecture") == "dinov2_vits14_joint":
+            similarity_model = predictor.model
+        else:
+            similarity_model = similarity_model_from_checkpoint(checkpoint)
+            similarity_model.load_state_dict(checkpoint["model_state_dict"])
+            similarity_model.to(predictor.device).eval()
         predictor.similarity_model = similarity_model
         predictor.clusterer = PieceClusterer(
-            float(checkpoint.get("similarity_threshold", 0.5))
+            float(checkpoint.get("similarity_threshold", 0.5)),
+            (
+                float(checkpoint["cross_background_similarity_threshold"])
+                if checkpoint.get("cross_background_similarity_threshold") is not None
+                else None
+            ),
         )
         predictor.assigner = GroupLabelAssigner(duplicate_penalty, predictor.class_names)
         return predictor
@@ -217,8 +239,14 @@ class BoardPredictor:
         batch = torch.stack([self.transform(square) for square in squares]).to(self.device)
 
         self.model.eval()
+        shared_embeddings: torch.Tensor | None = None
         with torch.no_grad():
-            logits = self.model(batch)
+            if self.model is self.similarity_model and hasattr(
+                self.model, "classify_and_encode"
+            ):
+                logits, shared_embeddings = self.model.classify_and_encode(batch)
+            else:
+                logits = self.model(batch)
         if logits.dim() != 2 or logits.shape[0] != NUM_SQUARES:
             raise ValueError(
                 f"Model returned logits of shape {tuple(logits.shape)}; "
@@ -235,8 +263,11 @@ class BoardPredictor:
 
         if self.similarity_model is not None:
             self.similarity_model.eval()
-            with torch.no_grad():
-                embeddings = self.similarity_model.encode(batch).cpu()
+            if shared_embeddings is not None:
+                embeddings = shared_embeddings.cpu()
+            else:
+                with torch.no_grad():
+                    embeddings = self.similarity_model.encode(batch).cpu()
             # Cluster every square, including empty squares. Occupancy is now a
             # group label inferred jointly with the twelve piece labels.
             clustering = self.clusterer.cluster(embeddings, list(range(NUM_SQUARES)))

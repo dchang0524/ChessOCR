@@ -38,7 +38,6 @@ def build_train_transforms(input_size: int = INPUT_SIZE) -> transforms.Compose:
         [
             transforms.Resize((input_size, input_size)),
             transforms.RandomCrop(input_size, padding=padding, padding_mode="edge"),
-            transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
             transforms.ToTensor(),
             transforms.Normalize(mean=NORMALIZATION_MEAN, std=NORMALIZATION_STD),
         ]

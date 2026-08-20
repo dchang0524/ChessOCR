@@ -1,0 +1,33 @@
+{
+  "classifier_checkpoint": "models/joint_dinov2_vits14_head.pt",
+  "similarity_checkpoint": "models/joint_dinov2_vits14_head.pt",
+  "training_source": "data/processed/sprites_transfer_256/metadata.csv",
+  "evaluation_source": "data/raw/kaggle_chess_positions/test",
+  "skip_boards": 0,
+  "board_count": 100,
+  "elapsed_seconds": 181.29732712497935,
+  "similarity_threshold": 0.924188494682312,
+  "cross_background_similarity_threshold": null,
+  "duplicate_penalty": 1.5,
+  "baseline": {
+    "square_accuracy": 0.93953125,
+    "occupied_accuracy": 0.9176161262050833,
+    "exact_board_accuracy": 0.36
+  },
+  "grouped": {
+    "square_accuracy": 0.9709375,
+    "occupied_accuracy": 0.9000876424189308,
+    "exact_board_accuracy": 0.57
+  },
+  "clustering": {
+    "scope": "all_64_squares_including_empty",
+    "false_merge_rate": 0.0009362982778799532,
+    "false_split_rate": 0.3435598098739573,
+    "predicted_merged_pairs": 89715,
+    "true_same_pairs": 136541,
+    "cross_background_false_merge_rate": 0.0015991123294824099,
+    "cross_background_false_split_rate": 0.5587972310354774,
+    "cross_background_predicted_merged_pairs": 30642,
+    "cross_background_true_same_pairs": 69340
+  }
+}

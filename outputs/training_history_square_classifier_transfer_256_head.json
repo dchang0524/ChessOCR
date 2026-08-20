@@ -1,0 +1,23 @@
+{
+  "epochs": [
+    {
+      "epoch": 1,
+      "train_loss": 0.6243739013671875,
+      "train_accuracy": 0.92025,
+      "val_loss": 0.33775740559895834,
+      "val_accuracy": 0.9983333333333333,
+      "seconds": 323.118724625092
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.389852294921875,
+      "train_accuracy": 0.989625,
+      "val_loss": 0.3229178466796875,
+      "val_accuracy": 0.9986666666666667,
+      "seconds": 326.49379808292724
+    }
+  ],
+  "best_epoch": 2,
+  "best_val_accuracy": 0.9986666666666667,
+  "checkpoint_path": "models/square_classifier_transfer_256_head.pt"
+}

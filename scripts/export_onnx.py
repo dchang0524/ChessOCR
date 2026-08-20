@@ -20,7 +20,7 @@ import onnx  # noqa: E402
 import torch  # noqa: E402
 
 from chess_ocr.data.labels import CLASS_NAMES, CLASS_TO_FEN  # noqa: E402
-from chess_ocr.models.square_classifier import SquareClassifier  # noqa: E402
+from chess_ocr.models.square_classifier import square_classifier_from_checkpoint  # noqa: E402
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
 
     class_names = list(checkpoint.get("class_names", CLASS_NAMES))
     input_size = int(checkpoint.get("input_size", 64))
-    model = SquareClassifier(num_classes=len(class_names))
+    model = square_classifier_from_checkpoint(checkpoint)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
@@ -87,10 +87,12 @@ def main(argv: list[str] | None = None) -> int:
         "input_name": "squares",
         "output_name": "logits",
         "input_size": input_size,
+        "architecture": model.architecture,
         "class_names": class_names,
         "fen_symbols": [CLASS_TO_FEN[name] for name in class_names],
         "normalization": {"mean": [0.5, 0.5, 0.5], "std": [0.5, 0.5, 0.5]},
-        "background_normalization": "four-corner residual and neutral-gray compositing",
+        "background_normalization": "disabled",
+        "background_variation": "generator-only, before piece compositing",
     }
     args.metadata.parent.mkdir(parents=True, exist_ok=True)
     args.metadata.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")

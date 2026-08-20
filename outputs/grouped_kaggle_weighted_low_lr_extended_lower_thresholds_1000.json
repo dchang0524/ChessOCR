@@ -1,0 +1,38 @@
+{
+  "classifier_checkpoint": "models/square_classifier_background_aug.pt",
+  "similarity_checkpoint": "models/similarity_background_aug_weighted_low_lr_extended.pt",
+  "evaluation_source": "data/raw/kaggle_chess_positions/test",
+  "skip_boards": 250,
+  "board_count": 1000,
+  "selection_metric": "grouped.occupied_accuracy",
+  "selected_similarity_threshold": 0.98,
+  "results": [
+    {
+      "similarity_threshold": 0.96,
+      "square_accuracy": 0.896484375,
+      "occupied_accuracy": 0.5780374275672081,
+      "exact_board_accuracy": 0.016,
+      "false_merge_rate": 0.002151637692353918,
+      "false_split_rate": 0.5176693215518964,
+      "source": "outputs/grouped_kaggle_weighted_low_lr_extended_threshold_096_1000.json"
+    },
+    {
+      "similarity_threshold": 0.97,
+      "square_accuracy": 0.896453125,
+      "occupied_accuracy": 0.5799373040752351,
+      "exact_board_accuracy": 0.015,
+      "false_merge_rate": 0.0011098927549410287,
+      "false_split_rate": 0.5236998454111482,
+      "source": "outputs/grouped_kaggle_weighted_low_lr_extended_threshold_097_1000.json"
+    },
+    {
+      "similarity_threshold": 0.98,
+      "square_accuracy": 0.898640625,
+      "occupied_accuracy": 0.5814572052816567,
+      "exact_board_accuracy": 0.013,
+      "false_merge_rate": 0.0003947298747936092,
+      "false_split_rate": 0.5586459943633872,
+      "source": "outputs/grouped_kaggle_weighted_low_lr_extended_threshold_098_1000.json"
+    }
+  ]
+}

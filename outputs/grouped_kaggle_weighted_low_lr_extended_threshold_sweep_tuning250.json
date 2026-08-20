@@ -1,0 +1,56 @@
+{
+  "classifier_checkpoint": "models/square_classifier_background_aug.pt",
+  "similarity_checkpoint": "models/similarity_background_aug_weighted_low_lr_extended.pt",
+  "evaluation_source": "data/raw/kaggle_chess_positions/test",
+  "skip_boards": 0,
+  "board_count": 250,
+  "selection_metric": "grouped.occupied_accuracy",
+  "tie_breakers": [
+    "grouped.square_accuracy",
+    "clustering.false_merge_rate"
+  ],
+  "selected_similarity_threshold": 0.98,
+  "baseline": {
+    "square_accuracy": 0.875375,
+    "occupied_accuracy": 0.5321270310192023,
+    "exact_board_accuracy": 0.004
+  },
+  "results": [
+    {
+      "similarity_threshold": 0.94,
+      "square_accuracy": 0.901375,
+      "occupied_accuracy": 0.5901033973412112,
+      "exact_board_accuracy": 0.016,
+      "false_merge_rate": 0.0043931149831685475,
+      "false_split_rate": 0.4606920042203771,
+      "source": "outputs/grouped_kaggle_weighted_low_lr_extended_threshold_094_tuning250.json"
+    },
+    {
+      "similarity_threshold": 0.96,
+      "square_accuracy": 0.9058125,
+      "occupied_accuracy": 0.5982274741506647,
+      "exact_board_accuracy": 0.012,
+      "false_merge_rate": 0.0027479035391102477,
+      "false_split_rate": 0.5172026239735767,
+      "source": "outputs/grouped_kaggle_weighted_low_lr_extended_threshold_096_tuning250.json"
+    },
+    {
+      "similarity_threshold": 0.98,
+      "square_accuracy": 0.9063125,
+      "occupied_accuracy": 0.5982274741506647,
+      "exact_board_accuracy": 0.012,
+      "false_merge_rate": 0.0009161224463086809,
+      "false_split_rate": 0.5622562961603743,
+      "source": "outputs/grouped_kaggle_weighted_low_lr_extended_threshold_098_tuning250.json"
+    },
+    {
+      "similarity_threshold": 0.99,
+      "square_accuracy": 0.9094375,
+      "occupied_accuracy": 0.5937961595273265,
+      "exact_board_accuracy": 0.008,
+      "false_merge_rate": 0.00006958893814239288,
+      "false_split_rate": 0.5880229597687967,
+      "source": "outputs/grouped_kaggle_weighted_low_lr_extended_threshold_099_tuning250.json"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "epochs": [
+    {
+      "epoch": 8,
+      "train_loss": 0.01241564141586423,
+      "train_accuracy": 0.9954,
+      "val_loss": 0.29432893500328067,
+      "val_accuracy": 0.8906,
+      "seconds": 311.4328682080377
+    },
+    {
+      "epoch": 9,
+      "train_loss": 0.01138482067734003,
+      "train_accuracy": 0.99545,
+      "val_loss": 0.3788738349199295,
+      "val_accuracy": 0.8538,
+      "seconds": 300.7629547920078
+    },
+    {
+      "epoch": 10,
+      "train_loss": 0.009116532889008521,
+      "train_accuracy": 0.996,
+      "val_loss": 0.08518602858781815,
+      "val_accuracy": 0.9674,
+      "seconds": 365.03684337507
+    },
+    {
+      "epoch": 11,
+      "train_loss": 0.0049570254407823085,
+      "train_accuracy": 0.9988,
+      "val_loss": 0.12074504665136337,
+      "val_accuracy": 0.9404,
+      "seconds": 368.6448550000787
+    }
+  ],
+  "best_epoch": 10,
+  "best_val_accuracy": 0.9674,
+  "similarity_threshold": 0.6706119775772095,
+  "calibration_positive_recall": 0.8579999804496765,
+  "calibration_negative_false_positive_rate": 0.005200000014156103
+}

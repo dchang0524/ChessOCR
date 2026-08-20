@@ -45,7 +45,14 @@ BUILTIN_THEMES = {
 
 BUNDLED_SPRITE_SETS = {
     name: PROJECT_ROOT / "assets" / "themes" / name
-    for name in ("chessnut", "fantasy", "spatial", "celtic", "rhosgfx")
+    for name in (
+        "chessnut",
+        "fantasy",
+        "spatial",
+        "celtic",
+        "rhosgfx",
+        "kiwen-suwi",
+    )
 }
 
 BOARD_PALETTES = {
@@ -112,6 +119,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=0.8,
         help="Fraction of rendered boards receiving imperfect-crop augmentation",
     )
+    parser.add_argument(
+        "--background-variation-probability",
+        type=float,
+        default=1.0,
+        help="Fraction of training boards receiving background-only variation",
+    )
+    parser.add_argument(
+        "--background-variation-strength",
+        type=float,
+        default=0.75,
+        help="Palette/gradient/texture variation strength in [0, 1]",
+    )
     parser.add_argument("--train-fraction", type=float, default=0.7)
     parser.add_argument("--val-fraction", type=float, default=0.15)
     parser.add_argument("--seed", type=int, default=0)
@@ -170,6 +189,8 @@ def main(argv: list[str] | None = None) -> int:
         seed=args.seed,
         crop_jitter_pixels=args.crop_jitter_pixels,
         crop_jitter_probability=args.crop_jitter_probability,
+        background_variation_probability=args.background_variation_probability,
+        background_variation_strength=args.background_variation_strength,
     )
     metadata_path = DatasetGenerator(themes=themes, config=config).generate(board_fens)
     print(f"Done. Metadata written to {metadata_path}")

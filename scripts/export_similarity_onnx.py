@@ -1,4 +1,4 @@
-"""Export the background-normalising similarity encoder for browser inference."""
+"""Export the raw-RGB similarity encoder for browser inference."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ import onnx  # noqa: E402
 import torch  # noqa: E402
 
 from chess_ocr.models.similarity_classifier import (  # noqa: E402
-    SimilarityClassifier,
     SimilarityEncoderExport,
+    similarity_model_from_checkpoint,
 )
 
 
@@ -29,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--metadata", type=Path, default=Path("web/model/model.json"))
     parser.add_argument("--similarity-threshold", type=float, default=None)
+    parser.add_argument("--cross-background-similarity-threshold", type=float, default=None)
     parser.add_argument("--opset", type=int, default=18)
     return parser.parse_args()
 
@@ -36,10 +37,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
-    model = SimilarityClassifier(int(checkpoint.get("embedding_size", 64)))
+    model = similarity_model_from_checkpoint(checkpoint)
     model.load_state_dict(checkpoint["model_state_dict"])
     wrapper = SimilarityEncoderExport(model.eval()).eval()
-    sample = torch.zeros(1, 3, int(checkpoint.get("input_size", 64)), 64)
+    input_size = int(checkpoint.get("input_size", 64))
+    sample = torch.zeros(1, 3, input_size, input_size)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.onnx.export(
         wrapper,
@@ -60,6 +62,11 @@ def main() -> int:
         if args.similarity_threshold is None
         else args.similarity_threshold
     )
+    cross_background_threshold = (
+        checkpoint.get("cross_background_similarity_threshold")
+        if args.cross_background_similarity_threshold is None
+        else args.cross_background_similarity_threshold
+    )
     metadata = json.loads(args.metadata.read_text(encoding="utf-8"))
     metadata["similarity"] = {
         "model_path": args.output.name,
@@ -68,9 +75,13 @@ def main() -> int:
         "input_name": "squares",
         "output_name": "embeddings",
         "embedding_size": model.embedding_size,
+        "architecture": model.architecture,
+        "input_size": input_size,
         "similarity_threshold": threshold,
+        "cross_background_similarity_threshold": cross_background_threshold,
         "duplicate_penalty": 1.5,
-        "background_normalization": "four-corner residual and neutral-gray compositing",
+        "background_normalization": "disabled",
+        "background_variation": "generator-only, before piece compositing",
         "includes_empty_class": bool(checkpoint.get("includes_empty_class", False)),
         "source_checkpoint": args.checkpoint.name,
         "source_epoch": checkpoint.get("epoch"),

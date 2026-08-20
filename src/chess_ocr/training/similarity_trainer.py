@@ -50,7 +50,7 @@ class SimilarityTrainer:
         self.device = device if isinstance(device, torch.device) else resolve_device(device)
         self.model = model.to(self.device)
         self.checkpoint_path = Path(checkpoint_path)
-        self.criterion = nn.BCEWithLogitsLoss()
+        self.criterion = nn.BCEWithLogitsLoss(reduction="none")
         self.optimizer = torch.optim.AdamW(
             model.parameters(), lr=learning_rate, weight_decay=weight_decay
         )
@@ -58,13 +58,23 @@ class SimilarityTrainer:
         self.history = SimilarityTrainingHistory()
 
     def fit(
-        self, train_loader: DataLoader, val_loader: DataLoader, epochs: int
+        self,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        epochs: int,
+        start_epoch: int = 0,
     ) -> SimilarityTrainingHistory:
         if epochs <= 0:
             raise ValueError("epochs must be positive")
+        if start_epoch < 0:
+            raise ValueError("start_epoch must be non-negative")
         self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         print(f"Training similarity model on device: {self.device}")
-        for epoch in range(1, epochs + 1):
+        final_epoch = start_epoch + epochs
+        for epoch in range(start_epoch + 1, final_epoch + 1):
+            set_epoch = getattr(train_loader.dataset, "set_epoch", None)
+            if callable(set_epoch):
+                set_epoch(epoch - 1)
             started = time.perf_counter()
             train_loss, train_accuracy = self._run_epoch(train_loader, training=True)
             val_loss, val_accuracy = self._run_epoch(val_loader, training=False)
@@ -80,7 +90,8 @@ class SimilarityTrainer:
                 self.save_checkpoint(epoch, val_accuracy)
             marker = " <- best" if improved else ""
             print(
-                f"epoch {epoch:3d}/{epochs} | train {train_loss:.4f} {train_accuracy:.4f} | "
+                f"epoch {epoch:3d}/{final_epoch} | train {train_loss:.4f} "
+                f"{train_accuracy:.4f} | "
                 f"val {val_loss:.4f} {val_accuracy:.4f} | {duration:.1f}s{marker}"
             )
         return self.history
@@ -91,14 +102,26 @@ class SimilarityTrainer:
         correct = 0
         seen = 0
         with torch.set_grad_enabled(training):
-            for square_a, square_b, targets in loader:
+            for batch in loader:
+                if len(batch) == 3:
+                    square_a, square_b, targets = batch
+                    pair_weights = torch.ones_like(targets)
+                elif len(batch) == 4:
+                    square_a, square_b, targets, pair_weights = batch
+                else:
+                    raise ValueError(
+                        "Similarity batches must contain squares A/B, targets, "
+                        "and optional pair weights"
+                    )
                 square_a = square_a.to(self.device)
                 square_b = square_b.to(self.device)
                 targets = targets.float().to(self.device)
+                pair_weights = pair_weights.float().to(self.device)
                 if training:
                     self.optimizer.zero_grad(set_to_none=True)
                 logits = self.model(square_a, square_b)
-                loss = self.criterion(logits, targets)
+                per_pair_loss = self.criterion(logits, targets)
+                loss = (per_pair_loss * pair_weights).sum() / pair_weights.sum().clamp_min(1)
                 if training:
                     loss.backward()
                     self.optimizer.step()
@@ -116,7 +139,8 @@ class SimilarityTrainer:
         payload = {
             "model_state_dict": model.state_dict(),
             "embedding_size": int(getattr(model, "embedding_size", 64)),
-            "input_size": 64,
+            "input_size": int(getattr(model, "input_size", 64)),
+            "architecture": str(getattr(model, "architecture", "compact")),
             "epoch": epoch,
             "validation_accuracy": validation_accuracy,
             "similarity_threshold": (

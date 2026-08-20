@@ -25,8 +25,8 @@ from chess_ocr.chess.position_validator import PositionValidator
 from chess_ocr.inference.board_predictor import BoardPredictor
 from chess_ocr.inference.prediction_result import BoardPrediction
 
-DEFAULT_CHECKPOINT = "models/square_classifier_generated.pt"
-DEFAULT_SIMILARITY_CHECKPOINT = "models/similarity_generated.pt"
+DEFAULT_CHECKPOINT = "models/square_classifier_background_aug.pt"
+DEFAULT_SIMILARITY_CHECKPOINT = "models/similarity_background_aug.pt"
 SUPPORTED_UPLOAD_TYPES = ["png", "jpg", "jpeg"]
 ASSUMED_FIELD_NOTE = (
     "The classifier only reads piece placement. Castling rights, en passant "

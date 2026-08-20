@@ -29,7 +29,7 @@ from chess_ocr.data.kaggle_board_dataset import (  # noqa: E402
     collate_kaggle_boards,
 )
 from chess_ocr.inference.board_predictor import resolve_device  # noqa: E402
-from chess_ocr.models.square_classifier import SquareClassifier  # noqa: E402
+from chess_ocr.models.square_classifier import square_classifier_from_checkpoint  # noqa: E402
 from chess_ocr.training.evaluator import EvaluationReport, Evaluator  # noqa: E402
 
 
@@ -144,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     class_names = list(checkpoint.get("class_names", []))
     input_size = int(checkpoint.get("input_size", 64))
-    model = SquareClassifier(num_classes=len(class_names) or 13)
+    model = square_classifier_from_checkpoint(checkpoint)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     if args.manifest is None:

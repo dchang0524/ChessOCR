@@ -20,7 +20,12 @@ export function cosineSimilarityMatrix(flatEmbeddings, count, embeddingSize) {
   return matrix;
 }
 
-export function completeLinkageClusters(similarityMatrix, squareIndices, threshold) {
+export function completeLinkageClusters(
+  similarityMatrix,
+  squareIndices,
+  threshold,
+  crossBackgroundThreshold = null,
+) {
   if (similarityMatrix.length !== squareIndices.length) {
     throw new Error("Similarity matrix and square indices must have the same size");
   }
@@ -34,7 +39,17 @@ export function completeLinkageClusters(similarityMatrix, squareIndices, thresho
         let completeSimilarity = Infinity;
         for (const a of groups[left]) {
           for (const b of groups[right]) {
-            completeSimilarity = Math.min(completeSimilarity, similarityMatrix[a][b]);
+            const firstSquare = squareIndices[a];
+            const secondSquare = squareIndices[b];
+            const firstColour = (Math.floor(firstSquare / 8) + firstSquare % 8) % 2;
+            const secondColour = (Math.floor(secondSquare / 8) + secondSquare % 8) % 2;
+            const boost = crossBackgroundThreshold !== null && firstColour !== secondColour
+              ? threshold - crossBackgroundThreshold
+              : 0;
+            completeSimilarity = Math.min(
+              completeSimilarity,
+              similarityMatrix[a][b] + boost,
+            );
           }
         }
         if (completeSimilarity > bestSimilarity) {

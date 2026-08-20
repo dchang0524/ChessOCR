@@ -1,0 +1,17 @@
+{
+  "epochs": [
+    {
+      "epoch": 1,
+      "train_loss": 0.39635240472853184,
+      "train_accuracy": 0.7578125,
+      "val_loss": 0.4360475306166336,
+      "val_accuracy": 0.765625,
+      "seconds": 12.095295584062114
+    }
+  ],
+  "best_epoch": 1,
+  "best_val_accuracy": 0.765625,
+  "similarity_threshold": 0.8563090562820435,
+  "calibration_positive_recall": 0.953125,
+  "calibration_negative_false_positive_rate": 0.015625
+}

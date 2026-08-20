@@ -1,0 +1,15 @@
+{
+  "epochs": [
+    {
+      "epoch": 1,
+      "train_loss": 0.34191452026367186,
+      "train_accuracy": 0.99775,
+      "val_loss": 0.31217063395182293,
+      "val_accuracy": 1.0,
+      "seconds": 474.22062949999236
+    }
+  ],
+  "best_epoch": 1,
+  "best_val_accuracy": 1.0,
+  "checkpoint_path": "models/square_classifier_transfer_256_finetuned.pt"
+}

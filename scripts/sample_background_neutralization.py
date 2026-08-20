@@ -1,4 +1,4 @@
-"""Visualize the exact background neutralization used by both CNNs."""
+"""Visualize the retained experimental neutralizer (not used by either CNN)."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ BOARD_SIDE = 8
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Sample boards and visualize the model's neutralized square inputs."
+        description="Sample boards and visualize the unused experimental neutralizer."
     )
     parser.add_argument(
         "--image-dir",

@@ -3,8 +3,10 @@ from __future__ import annotations
 import torch
 
 from chess_ocr.models.background_normalizer import SquareBackgroundNormalizer
-from chess_ocr.models.similarity_classifier import SimilarityClassifier
-from chess_ocr.models.square_classifier import SquareClassifier
+from chess_ocr.models.similarity_classifier import (
+    SimilarityClassifier,
+    similarity_model_from_checkpoint,
+)
 
 
 def test_background_normalizer_maps_two_square_colours_to_same_neutral_background() -> None:
@@ -28,17 +30,6 @@ def test_similarity_encoder_returns_unit_embeddings() -> None:
     assert torch.allclose(embeddings.norm(dim=1), torch.ones(4), atol=1e-5)
 
 
-def test_square_classifier_uses_the_same_background_normalizer() -> None:
-    classifier = SquareClassifier().eval()
-    light = torch.full((1, 3, 64, 64), 0.7)
-    dark = torch.full((1, 3, 64, 64), -0.7)
-
-    with torch.no_grad():
-        logits = classifier(torch.cat((light, dark)))
-
-    assert torch.allclose(logits[0], logits[1], atol=1e-6)
-
-
 def test_siamese_forward_is_symmetric() -> None:
     model = SimilarityClassifier().eval()
     first = torch.randn(2, 3, 64, 64)
@@ -56,3 +47,32 @@ def test_identical_inputs_have_higher_similarity_than_random_inputs() -> None:
     different = model(first, second)
 
     assert torch.all(same > different)
+
+
+def test_transfer_encoder_supports_256px_inputs() -> None:
+    model = SimilarityClassifier(
+        embedding_size=128,
+        architecture="mobilenet_v3_small",
+        pretrained_backbone=False,
+        input_size=256,
+    ).eval()
+
+    with torch.no_grad():
+        embeddings = model.encode(torch.randn(2, 3, 256, 256))
+
+    assert embeddings.shape == (2, 128)
+    assert torch.allclose(embeddings.norm(dim=1), torch.ones(2), atol=1e-5)
+
+
+def test_checkpoint_factory_preserves_transfer_architecture() -> None:
+    model = similarity_model_from_checkpoint(
+        {
+            "architecture": "mobilenet_v3_small",
+            "embedding_size": 128,
+            "input_size": 256,
+        }
+    )
+
+    assert model.architecture == "mobilenet_v3_small"
+    assert model.embedding_size == 128
+    assert model.input_size == 256

@@ -1,0 +1,311 @@
+{
+  "checkpoint": "models/square_classifier_transfer_256_finetuned.pt",
+  "image_dir": "data/raw/kaggle_chess_positions/test",
+  "manifest": null,
+  "split": null,
+  "elapsed_seconds": 145.6868814160116,
+  "overall_accuracy": 0.86921875,
+  "empty_accuracy": 1.0,
+  "occupied_accuracy": 0.26643295354951796,
+  "per_class": [
+    {
+      "class_name": "empty",
+      "support": 5259,
+      "precision": 0.9082901554404145,
+      "recall": 1.0,
+      "accuracy": 0.91703125
+    },
+    {
+      "class_name": "white_pawn",
+      "support": 107,
+      "precision": 0.6078431372549019,
+      "recall": 0.2897196261682243,
+      "accuracy": 0.985
+    },
+    {
+      "class_name": "white_knight",
+      "support": 91,
+      "precision": 0.8888888888888888,
+      "recall": 0.08791208791208792,
+      "accuracy": 0.986875
+    },
+    {
+      "class_name": "white_bishop",
+      "support": 201,
+      "precision": 0.5064935064935064,
+      "recall": 0.3880597014925373,
+      "accuracy": 0.96890625
+    },
+    {
+      "class_name": "white_rook",
+      "support": 99,
+      "precision": 0.5061728395061729,
+      "recall": 0.8282828282828283,
+      "accuracy": 0.98484375
+    },
+    {
+      "class_name": "white_queen",
+      "support": 36,
+      "precision": 0.18604651162790697,
+      "recall": 0.4444444444444444,
+      "accuracy": 0.9859375
+    },
+    {
+      "class_name": "white_king",
+      "support": 100,
+      "precision": 0.8108108108108109,
+      "recall": 0.3,
+      "accuracy": 0.98796875
+    },
+    {
+      "class_name": "black_pawn",
+      "support": 85,
+      "precision": 0.5,
+      "recall": 0.09411764705882353,
+      "accuracy": 0.98671875
+    },
+    {
+      "class_name": "black_knight",
+      "support": 84,
+      "precision": 0.0,
+      "recall": 0.0,
+      "accuracy": 0.986875
+    },
+    {
+      "class_name": "black_bishop",
+      "support": 104,
+      "precision": 0.36,
+      "recall": 0.08653846153846154,
+      "accuracy": 0.98265625
+    },
+    {
+      "class_name": "black_rook",
+      "support": 98,
+      "precision": 0.96,
+      "recall": 0.24489795918367346,
+      "accuracy": 0.98828125
+    },
+    {
+      "class_name": "black_queen",
+      "support": 36,
+      "precision": 0.0,
+      "recall": 0.0,
+      "accuracy": 0.9940625
+    },
+    {
+      "class_name": "black_king",
+      "support": 100,
+      "precision": 0.4186046511627907,
+      "recall": 0.18,
+      "accuracy": 0.98328125
+    }
+  ],
+  "board_metrics": {
+    "board_count": 100,
+    "exact_board_accuracy": 0.0,
+    "mean_incorrect_squares": 8.37,
+    "error_distribution": {
+      "0": 0.0,
+      "1": 0.0,
+      "2": 0.01,
+      "3+": 0.99
+    }
+  },
+  "confusion_matrix": [
+    [
+      5259,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      43,
+      31,
+      1,
+      5,
+      12,
+      11,
+      2,
+      2,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      35,
+      0,
+      8,
+      24,
+      10,
+      12,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0
+    ],
+    [
+      89,
+      15,
+      0,
+      78,
+      6,
+      3,
+      3,
+      0,
+      0,
+      2,
+      0,
+      0,
+      5
+    ],
+    [
+      11,
+      1,
+      0,
+      0,
+      82,
+      4,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      7,
+      0,
+      0,
+      3,
+      9,
+      16,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      33,
+      3,
+      0,
+      7,
+      9,
+      9,
+      30,
+      0,
+      0,
+      1,
+      0,
+      0,
+      8
+    ],
+    [
+      64,
+      1,
+      0,
+      6,
+      1,
+      2,
+      0,
+      8,
+      0,
+      0,
+      1,
+      0,
+      2
+    ],
+    [
+      67,
+      0,
+      0,
+      7,
+      1,
+      2,
+      0,
+      2,
+      0,
+      3,
+      0,
+      0,
+      2
+    ],
+    [
+      72,
+      0,
+      0,
+      15,
+      1,
+      1,
+      0,
+      4,
+      0,
+      9,
+      0,
+      0,
+      2
+    ],
+    [
+      30,
+      0,
+      0,
+      1,
+      30,
+      11,
+      0,
+      0,
+      0,
+      1,
+      24,
+      0,
+      1
+    ],
+    [
+      21,
+      0,
+      0,
+      2,
+      0,
+      8,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      5
+    ],
+    [
+      59,
+      0,
+      0,
+      6,
+      1,
+      7,
+      0,
+      0,
+      0,
+      7,
+      0,
+      2,
+      18
+    ]
+  ]
+}

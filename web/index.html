@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Turn a digital chessboard screenshot into FEN directly in your browser.">
     <title>Chess OCR — Screenshot to FEN</title>
-    <link rel="stylesheet" href="./styles.css?v=20260813">
+    <link rel="stylesheet" href="./styles.css?v=20260820">
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=20260820-dino"></script>
   </head>
   <body>
     <div class="shell">
@@ -98,6 +98,16 @@
             </div>
           </div>
 
+          <section class="group-browser" aria-labelledby="group-browser-heading">
+            <div class="group-browser-heading">
+              <div>
+                <p id="group-browser-heading" class="panel-label">Appearance groups</p>
+                <p id="group-summary" class="group-summary">Select a group to highlight its squares.</p>
+              </div>
+            </div>
+            <div id="group-list" class="group-list" aria-label="Classified appearance groups"></div>
+          </section>
+
           <div id="correction-panel" class="correction-panel" hidden>
             <p class="panel-label">Correct a prediction</p>
             <p id="correction-summary"></p>
@@ -106,7 +116,7 @@
               <button id="apply-square" class="ghost-button" type="button">Apply to this square</button>
               <button id="apply-group" class="primary-button compact" type="button">Apply to whole group</button>
             </div>
-            <p class="assumption">Click any square on the predicted board. Group corrections are fixed while the remaining groups are reassigned.</p>
+            <p class="assumption">Click a group icon or any square on the predicted board. Group corrections are fixed while the remaining groups are reassigned.</p>
           </div>
 
           <div class="fen-group">
