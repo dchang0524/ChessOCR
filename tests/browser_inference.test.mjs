@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
 import { bestClass, buildBoardFen, softmax, squareName } from "../web/chess.js";
@@ -7,6 +9,31 @@ import {
   completeLinkageClusters,
   cosineSimilarityMatrix,
 } from "../web/grouping.js";
+
+test("browser catalog exposes the three requested model modes with valid assets", async () => {
+  const modelDirectory = new URL("../web/model/", import.meta.url);
+  const catalog = JSON.parse(await readFile(new URL("models.json", modelDirectory), "utf8"));
+  const expectedIds = [
+    "kaggle-baseline",
+    "dino-kaggle-grouped",
+    "dino-generated-grouped",
+  ];
+  assert.deepEqual(catalog.models.map((model) => model.id), expectedIds);
+  assert.equal(catalog.default_model, "kaggle-baseline");
+
+  for (const definition of catalog.models) {
+    const metadata = JSON.parse(
+      await readFile(new URL(definition.metadata_path, modelDirectory), "utf8"),
+    );
+    assert.equal(Boolean(metadata.similarity), definition.grouping);
+    const modelPath = new URL(metadata.model_path, modelDirectory);
+    const modelBytes = await readFile(modelPath);
+    const modelStat = await stat(modelPath);
+    assert.equal(modelStat.size, metadata.model_bytes);
+    assert.ok(modelStat.size <= 25 * 1024 * 1024);
+    assert.equal(createHash("sha256").update(modelBytes).digest("hex"), metadata.model_sha256);
+  }
+});
 
 test("buildBoardFen encodes the starting position", () => {
   const classIds = [

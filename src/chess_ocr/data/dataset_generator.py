@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Protocol
 
 import chess
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from chess_ocr.chess.fen_builder import board_fen_to_class_ids
 from chess_ocr.data.labels import (
@@ -62,6 +62,25 @@ METADATA_FIELDS = (
 
 #: Unicode code points for the solid ("black") chess glyphs, keyed by piece type.
 _GLYPHS = {
+    "p": "\u265f",
+    "n": "\u265e",
+    "b": "\u265d",
+    "r": "\u265c",
+    "q": "\u265b",
+    "k": "\u265a",
+}
+
+# The reconstructed board in ``web/chess.js`` deliberately uses the distinct
+# white and black Unicode code points.  Keep this mapping separate from
+# ``_GLYPHS``: SyntheticBoardTheme recolours one solid silhouette, whereas the
+# browser preview relies on the font's outlined white-piece artwork.
+_WEB_PREVIEW_GLYPHS = {
+    "P": "\u2659",
+    "N": "\u2658",
+    "B": "\u2657",
+    "R": "\u2656",
+    "Q": "\u2655",
+    "K": "\u2654",
     "p": "\u265f",
     "n": "\u265e",
     "b": "\u265d",
@@ -348,6 +367,76 @@ class SyntheticBoardTheme:
             draw.rectangle(inner, fill=fill, outline=stroke, width=outline_width)
             draw.line((cx, inner[1], cx, inner[3]), fill=stroke, width=outline_width * 2)
             draw.line((inner[0], cy, inner[2], cy), fill=stroke, width=outline_width * 2)
+
+
+@dataclass
+class WebsitePreviewBoardTheme:
+    """Reproduce the Unicode board shown by the static browser application.
+
+    The website does not use raster piece sprites. It lays out Unicode chess
+    glyphs in the system font with the palette and text shadows from
+    ``web/styles.css``. On macOS the first usable chess font is Apple Symbols,
+    which also matches the browser's normal fallback for these code points.
+    """
+
+    name: str = "website_preview"
+    light_rgb: tuple[int, int, int] = (216, 199, 163)  # #d8c7a3
+    dark_rgb: tuple[int, int, int] = (109, 119, 94)  # #6d775e
+    white_piece_rgb: tuple[int, int, int] = (255, 248, 232)  # #fff8e8
+    black_piece_rgb: tuple[int, int, int] = (23, 26, 32)  # #171a20
+    piece_scale: float = 0.92
+
+    def render_board(
+        self,
+        board_fen: str,
+        size: int = DEFAULT_BOARD_SIZE,
+        background_rng: random.Random | None = None,
+        background_variation_strength: float = 0.0,
+    ) -> Image.Image:
+        """Render a board using the browser preview's colors, glyphs and shadows."""
+        board = render_square_backgrounds(
+            size,
+            self.light_rgb,
+            self.dark_rgb,
+            background_rng,
+            background_variation_strength,
+        ).convert("RGBA")
+        edges = [round(index * size / BOARD_SIDE) for index in range(BOARD_SIDE + 1)]
+        square_pixels = max(1, size // BOARD_SIDE)
+        font = find_chess_font(max(1, round(square_pixels * self.piece_scale)))
+        if font is None:
+            raise RuntimeError("The website-preview theme requires a Unicode chess font")
+
+        for index, class_id in enumerate(board_fen_to_class_ids(board_fen)):
+            symbol = CLASS_ID_TO_FEN[class_id]
+            if not symbol:
+                continue
+            row, column = divmod(index, BOARD_SIDE)
+            centre = (
+                (edges[column] + edges[column + 1]) / 2,
+                (edges[row] + edges[row + 1]) / 2,
+            )
+            glyph = _WEB_PREVIEW_GLYPHS[symbol]
+            fill = self.white_piece_rgb if symbol.isupper() else self.black_piece_rgb
+            shadow = self.black_piece_rgb if symbol.isupper() else (255, 255, 255)
+            shadow_opacity = 255 if symbol.isupper() else 77
+            shadow_blur = max(1, round(square_pixels / 48))
+
+            mask = Image.new("L", (size, size), 0)
+            ImageDraw.Draw(mask).text(centre, glyph, font=font, fill=255, anchor="mm")
+            blurred = mask.filter(ImageFilter.GaussianBlur(shadow_blur))
+            offset_mask = Image.new("L", (size, size), 0)
+            offset_mask.paste(blurred, (0, max(1, round(square_pixels / 64))))
+            if shadow_opacity != 255:
+                offset_mask = offset_mask.point(lambda value: value * shadow_opacity // 255)
+            shadow_layer = Image.new("RGBA", (size, size), (*shadow, 0))
+            shadow_layer.putalpha(offset_mask)
+            board = Image.alpha_composite(board, shadow_layer)
+
+            glyph_layer = Image.new("RGBA", (size, size), (*fill, 0))
+            glyph_layer.putalpha(mask)
+            board = Image.alpha_composite(board, glyph_layer)
+        return board.convert("RGB")
 
 
 @dataclass

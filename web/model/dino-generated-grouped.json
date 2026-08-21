@@ -1,0 +1,79 @@
+{
+  "format": "onnx",
+  "opset": 18,
+  "architecture": "dinov2_vits14_joint",
+  "joint_model": true,
+  "quantization": "dynamic-int8-weights",
+  "source_checkpoint": "joint_dinov2_vits14_head.pt",
+  "source_epoch": 1,
+  "source_validation_accuracy": 0.94,
+  "model_path": "joint_dinov2_vits14_generated_int8.onnx",
+  "model_sha256": "cd93a69255a30d7508dfa34808b0a99391752f582d19ac45c4ca0f632c793cd9",
+  "model_bytes": 25486229,
+  "input_name": "squares",
+  "output_name": "logits",
+  "input_size": 224,
+  "inference_batch_size": 4,
+  "class_names": [
+    "empty",
+    "white_pawn",
+    "white_knight",
+    "white_bishop",
+    "white_rook",
+    "white_queen",
+    "white_king",
+    "black_pawn",
+    "black_knight",
+    "black_bishop",
+    "black_rook",
+    "black_queen",
+    "black_king"
+  ],
+  "fen_symbols": [
+    "",
+    "P",
+    "N",
+    "B",
+    "R",
+    "Q",
+    "K",
+    "p",
+    "n",
+    "b",
+    "r",
+    "q",
+    "k"
+  ],
+  "normalization": {
+    "mean": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "std": [
+      0.5,
+      0.5,
+      0.5
+    ]
+  },
+  "background_normalization": "disabled",
+  "background_variation": "generator-only, before piece compositing",
+  "background_invariance": "paired cross-background consistency loss",
+  "similarity": {
+    "model_path": "joint_dinov2_vits14_generated_int8.onnx",
+    "model_sha256": "cd93a69255a30d7508dfa34808b0a99391752f582d19ac45c4ca0f632c793cd9",
+    "model_bytes": 25486229,
+    "input_name": "squares",
+    "output_name": "embeddings",
+    "embedding_size": 128,
+    "architecture": "dinov2_vits14_joint",
+    "input_size": 224,
+    "similarity_threshold": 0.9489498746395111,
+    "cross_background_similarity_threshold": null,
+    "duplicate_penalty": 1.5,
+    "includes_empty_class": true,
+    "source_checkpoint": "joint_dinov2_vits14_head.pt",
+    "source_epoch": 1,
+    "source_validation_accuracy": 0.824
+  }
+}

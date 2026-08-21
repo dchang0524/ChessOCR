@@ -1,0 +1,28 @@
+{
+  "epochs": [
+    {
+      "epoch": 3,
+      "train_loss": 0.30892687249183653,
+      "train_class_accuracy": 0.999875,
+      "train_pair_accuracy": 1.0,
+      "train_consistency_loss": 0.007720690928865224,
+      "val_loss": 0.30622018241882326,
+      "val_class_accuracy": 1.0,
+      "val_pair_accuracy": 1.0,
+      "val_consistency_loss": 0.0010156983378110454,
+      "seconds": 271.9978142499458
+    }
+  ],
+  "best_epoch": 3,
+  "best_validation_class_accuracy": 1.0,
+  "checkpoint_path": "models/joint_dinov2_vits14_kaggle90_website.pt",
+  "initial_checkpoint": "models/joint_dinov2_vits14_kaggle90.pt",
+  "website_pairs_per_epoch": 2000,
+  "kaggle_replay_boards": 2000,
+  "website_validation_pairs": 500,
+  "kaggle_calibration_boards": 500,
+  "reserved_kaggle_test_used_for_training": false,
+  "similarity_threshold": 0.132581889629364,
+  "calibration_positive_recall": 1.0,
+  "calibration_negative_false_positive_rate": 0.006000000052154064
+}

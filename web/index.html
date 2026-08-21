@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Turn a digital chessboard screenshot into FEN directly in your browser.">
     <title>Chess OCR — Screenshot to FEN</title>
-    <link rel="stylesheet" href="./styles.css?v=20260820">
+    <link rel="stylesheet" href="./styles.css?v=20260821-models">
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
-    <script type="module" src="./app.js?v=20260820-dino"></script>
+    <script type="module" src="./app.js?v=20260821-models"></script>
   </head>
   <body>
     <div class="shell">
@@ -29,6 +29,15 @@
               <h2 id="upload-heading">1. Choose a screenshot</h2>
               <p>Choose a screenshot or photo from your device. The board can be part of a larger image.</p>
             </div>
+          </div>
+          <div class="model-picker">
+            <div class="control">
+              <label for="model-select">Recognition model</label>
+              <select id="model-select" disabled>
+                <option>Loading model choices…</option>
+              </select>
+            </div>
+            <p id="model-description">Choose between the compact one-shot baseline and two grouped DINOv2 models.</p>
           </div>
           <div id="upload-zone" class="upload-zone">
             <div>
@@ -98,7 +107,7 @@
             </div>
           </div>
 
-          <section class="group-browser" aria-labelledby="group-browser-heading">
+          <section id="group-browser" class="group-browser" aria-labelledby="group-browser-heading">
             <div class="group-browser-heading">
               <div>
                 <p id="group-browser-heading" class="panel-label">Appearance groups</p>
@@ -116,7 +125,7 @@
               <button id="apply-square" class="ghost-button" type="button">Apply to this square</button>
               <button id="apply-group" class="primary-button compact" type="button">Apply to whole group</button>
             </div>
-            <p class="assumption">Click a group icon or any square on the predicted board. Group corrections are fixed while the remaining groups are reassigned.</p>
+            <p id="correction-help" class="assumption">Click a group icon or any square on the predicted board. Group corrections are fixed while the remaining groups are reassigned.</p>
           </div>
 
           <div class="fen-group">

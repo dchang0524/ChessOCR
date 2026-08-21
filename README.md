@@ -30,9 +30,12 @@ crop without touching the classifier or the FEN logic.
 ### Honest status
 
 The full pipeline — generated-data creation, training, evaluation, inference, grouping and UI — is
-implemented and exercised end to end. The current browser model is the production grouped DINOv2
-model described below. Its chess-specific heads were initialized from the generated-only DINOv2
-checkpoint and then trained on 90% of the Kaggle boards. The remaining 10% holds out board
+implemented and exercised end to end. The browser offers the compact Kaggle one-shot baseline, the
+production grouped DINOv2 model and the generated-only grouped DINOv2 model described below. The
+compact Kaggle one-shot model is the browser default. The production grouped model's chess-specific
+heads were initialized from the generated-only DINOv2 checkpoint, trained on 90% of the Kaggle
+boards, and then fine-tuned with Kaggle replay plus the website's Unicode preview theme. The
+remaining 10% holds out board
 positions, not piece themes: it contains the same renderer and theme distribution as training.
 Production accuracy is therefore inflated as an estimate of performance on unseen themes, and the
 production model has no demonstrated unseen-theme generalization benchmark.
@@ -99,6 +102,30 @@ position leakage between partitions. Training boards receive background-only pal
 texture and crop-offset variation before the unmodified transparent piece sprite is composited.
 The experimental background-neutralization module remains in the repository but is disabled in
 the current training and inference paths.
+
+### Finding: filled silhouettes versus outlined pieces
+
+Most bundled training sprites form opaque, contiguous regions of concentrated piece color. This
+makes foreground area, fill density and interior color useful shortcuts in addition to the actual
+piece contour. The website preview revealed a different representation: its white Unicode chess
+glyphs are primarily outlines, so much of the apparent piece interior is the board square showing
+through, while its black glyphs are more solid. The model never receives an alpha channel; after
+rendering, it sees ordinary RGB pixels whose outlined interiors have the background color.
+
+This produces a meaningful theme shift from fill-dominated silhouettes to contour-dominated
+shapes. The original Kaggle-trained grouped DINOv2 model reached 97.66% occupied-square and 73%
+exact-board accuracy on 200 held-out website-preview positions. After one mixed website-theme and
+Kaggle-replay continuation epoch, both measurements reached 100%. This improvement supports the
+hypothesis that the earlier heads depended partly on concentrated foreground color and had not
+learned sufficiently robust outline features. It does not by itself prove that the network used
+only borders; an interior-versus-contour occlusion experiment would be needed to isolate that
+causal mechanism.
+
+A broader future augmentation should derive solid, outline-only, partially filled, variable-stroke
+and low-contrast versions from the same foreground mask, then treat those renderings as positive
+pairs in the similarity and consistency losses. That would explicitly teach the embedding that
+piece identity is unchanged when a theme moves information between the interior and the contour,
+instead of specializing only to this one Unicode font.
 
 ### One-shot classifier
 
@@ -416,6 +443,14 @@ inflated as an estimate of real generalization: training and holdout boards use 
 themes and rendering pipeline. Holding out positions prevents exact-board leakage, but it does not
 measure performance on a genuinely unseen piece set.
 
+The browser's reconstructed board exposed another concrete theme gap: it uses distinct outlined
+and filled Unicode glyphs in the system font rather than any bundled PNG sprite family. We added a
+renderer matching its tan/green palette, Apple/system chess glyphs, piece colors and text shadows.
+Starting from the preserved Kaggle checkpoint, one additional frozen-backbone epoch mixed 2,000
+website-theme pairs with 2,000 Kaggle training-split replay pairs at learning rate `5e-5`. The
+1,000-pair monitoring set reached 100% class and pair accuracy. No Kaggle test board entered this
+continuation run.
+
 ### Production DINOv2 group classifier (Kaggle fine-tuned)
 
 #### Architecture
@@ -448,6 +483,9 @@ every board prediction unchanged.
 | Threshold selection, first 100 | grouped at 0.95 | 100.0000% | 100.0000% | 100.00% |
 | Disjoint threshold validation, next 1,000 | one-shot | 99.9969% | 99.9800% | 99.80% |
 | Disjoint threshold validation, next 1,000 | grouped at 0.95 | 99.9984% | 99.9900% | 99.90% |
+| Website preview, 200 unseen generated positions, before continuation | grouped at 0.95 | 99.3516% | 97.6587% | 73.00% |
+| Website preview, same 200 positions, after continuation | grouped at 0.95 | 100.0000% | 100.0000% | 100.00% |
+| Kaggle holdout smoke test, first 100, after continuation | grouped at 0.95 | 100.0000% | 100.0000% | 100.00% |
 
 On the disjoint 1,000-board slice, grouping reduced two wrong squares to one without introducing a
 new error. This is a real observed improvement but very small in absolute terms, and it is based on
@@ -455,10 +493,11 @@ only three one-shot errors across the selection and validation slices. More impo
 slice tests a new theme. The high grouped accuracy is inflated by same-theme train/holdout overlap
 and must not be presented as evidence that the production model generalizes to unseen themes.
 
-The exported quantized browser artifact was compared with PyTorch on 10 deterministic holdout
-boards: all 640 one-shot labels, all 640 grouped labels and all 10 cluster partitions agreed. This
-is an export smoke test, not a replacement for evaluating the quantized artifact on the full
-holdout or on genuinely unseen themes.
+The updated quantized browser artifact matched PyTorch on all 640 labels and all 10 cluster
+partitions in a website-theme export check. On a separate 10-board Kaggle export check, 639/640
+one-shot labels and 9/10 cluster partitions matched; ONNX had two incorrect squares while PyTorch
+had one. This is a quantization smoke test, not a replacement for evaluating the artifact on the
+full holdout or on genuinely unseen themes.
 
 ### Current conclusion
 
@@ -470,14 +509,17 @@ holdout or on genuinely unseen themes.
 | MobileNetV3 grouped | 100 | 88.56% | 54.08% | 0% |
 | DINOv2 one-shot | 100 | 93.95% | **91.76%** | 36% |
 | DINOv2 grouped | 100 | **97.09%** | 90.01% | **57%** |
-| Production DINOv2 one-shot | 10,000 | 99.9970% | 99.9810% | 99.81% |
-| Production DINOv2 grouped at 0.95 | 1,000 | 99.9984% | 99.9900% | 99.90% |
+| Production DINOv2 one-shot, before website continuation | 10,000 | 99.9970% | 99.9810% | 99.81% |
+| Production DINOv2 grouped at 0.95, before website continuation | 1,000 | 99.9984% | 99.9900% | 99.90% |
+| Website-tuned production DINOv2 grouped, website preview | 200 | 100.00% | 100.00% | 100.00% |
+| Website-tuned production DINOv2 grouped, Kaggle holdout smoke | 100 | 100.00% | 100.00% | 100.00% |
 
 Rows with different board counts are not direct comparisons. On the shared 100-board slice,
 DINOv2 is the clearest improvement among the generated-only experiments. The two production rows
 are not comparable measures of unseen-theme generalization because their Kaggle training and
-holdout partitions share themes. The production grouped DINOv2 model at threshold 0.95 is the model
-currently packaged for the browser.
+holdout partitions share themes. The compact Kaggle one-shot model is selected by default in the
+browser; the Kaggle-trained and generated-only grouped DINOv2 models remain available from the same
+on-demand selector.
 
 ---
 
@@ -605,6 +647,23 @@ python scripts/train_joint_dino_kaggle.py \
 This command does not create an unseen-theme validation set. Its 10% holdout contains different
 boards rendered from the same Kaggle theme distribution as the 90% training partition.
 
+Generate the browser-preview Unicode theme and continue the Kaggle checkpoint with Kaggle replay:
+
+```bash
+python scripts/generate_dataset.py \
+  --output-dir data/processed/website_preview_v1 --positions 500 \
+  --themes website_preview --square-size 224 \
+  --crop-jitter-pixels 0 --crop-jitter-probability 0 \
+  --background-variation-probability 0 --background-variation-strength 0
+python scripts/train_joint_dino_website.py \
+  --initial-checkpoint models/joint_dinov2_vits14_kaggle90.pt \
+  --checkpoint models/joint_dinov2_vits14_kaggle90_website.pt
+```
+
+The continuation script freezes DINOv2, mixes 2,000 generated website-theme pairs with 2,000
+Kaggle training-split replay boards, and stores the board-level production threshold of `0.95`.
+The original Kaggle checkpoint is never overwritten.
+
 Render examples of the exact generator-side background and crop-offset augmentations with:
 
 ```bash
@@ -659,9 +718,11 @@ low-confidence threshold (default `0.80`), then upload and crop.
 
 ### Browser inference
 
-The static app in `web/` runs the joint DINOv2 classifier and embedding model locally with ONNX
-Runtime Web. The uploaded screenshot never goes to an inference server. Export and dynamically
-quantize the latest checkpoint whenever you retrain:
+The static app in `web/` runs all inference locally with ONNX Runtime Web. Its on-demand model
+selector offers the compact Kaggle-trained one-shot classifier, the Kaggle-trained grouped DINOv2
+model and the generated-only grouped DINOv2 model. Only the selected model is downloaded. The
+uploaded screenshot never goes to an inference server. Export and dynamically quantize the latest
+checkpoint whenever you retrain:
 
 ```bash
 python scripts/export_joint_dino_onnx.py \

@@ -1,0 +1,80 @@
+{
+  "checkpoint": "models/joint_dinov2_vits14_kaggle90.pt",
+  "evaluation_source": "data/evaluation/website_preview_v1",
+  "skip_boards": 0,
+  "board_count": 200,
+  "elapsed_seconds": 16.862044000066817,
+  "preprocessing": "whole board resized to 8 * model input, then split",
+  "exact_identical_input_cache": {
+    "requests": 12800,
+    "unique_inputs": 165,
+    "hit_rate": 0.987109375
+  },
+  "similarity_threshold": 0.95,
+  "duplicate_penalty": 1.5,
+  "baseline": {
+    "square_accuracy": 0.989140625,
+    "occupied_accuracy": 0.9607898448519041,
+    "exact_board_accuracy": 0.535
+  },
+  "grouped": {
+    "square_accuracy": 0.993515625,
+    "occupied_accuracy": 0.9765867418899858,
+    "exact_board_accuracy": 0.73
+  },
+  "clustering": {
+    "scope": "all_64_squares_including_empty",
+    "false_merge_rate": 0.0,
+    "false_split_rate": 0.001391126079953141,
+    "predicted_merged_pairs": 218224,
+    "true_same_pairs": 218528,
+    "cross_background_false_merge_rate": 0.0,
+    "cross_background_false_split_rate": 0.0027366184757755254,
+    "cross_background_predicted_merged_pairs": 110782,
+    "cross_background_true_same_pairs": 111086
+  },
+  "threshold_sweep": [
+    {
+      "similarity_threshold": 0.8,
+      "square_accuracy": 0.99640625,
+      "occupied_accuracy": 0.9870239774330042,
+      "exact_board_accuracy": 0.85,
+      "mean_group_count": 10.465
+    },
+    {
+      "similarity_threshold": 0.85,
+      "square_accuracy": 0.993515625,
+      "occupied_accuracy": 0.9765867418899858,
+      "exact_board_accuracy": 0.73,
+      "mean_group_count": 10.59
+    },
+    {
+      "similarity_threshold": 0.9,
+      "square_accuracy": 0.993515625,
+      "occupied_accuracy": 0.9765867418899858,
+      "exact_board_accuracy": 0.73,
+      "mean_group_count": 10.63
+    },
+    {
+      "similarity_threshold": 0.95,
+      "square_accuracy": 0.993515625,
+      "occupied_accuracy": 0.9765867418899858,
+      "exact_board_accuracy": 0.73,
+      "mean_group_count": 10.91
+    },
+    {
+      "similarity_threshold": 0.98,
+      "square_accuracy": 0.993515625,
+      "occupied_accuracy": 0.9765867418899858,
+      "exact_board_accuracy": 0.73,
+      "mean_group_count": 11.08
+    },
+    {
+      "similarity_threshold": 0.99,
+      "square_accuracy": 0.99328125,
+      "occupied_accuracy": 0.9757404795486601,
+      "exact_board_accuracy": 0.72,
+      "mean_group_count": 11.105
+    }
+  ]
+}

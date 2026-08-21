@@ -1,0 +1,29 @@
+{
+  "default_model": "kaggle-baseline",
+  "models": [
+    {
+      "id": "kaggle-baseline",
+      "label": "Kaggle baseline · one-shot",
+      "short_label": "Kaggle baseline",
+      "description": "Compact 64×64 CNN trained on Kaggle. Fastest option; classifies each square independently and does not create appearance groups.",
+      "metadata_path": "kaggle-baseline.json",
+      "grouping": false
+    },
+    {
+      "id": "dino-kaggle-grouped",
+      "label": "DINOv2 grouped · Kaggle trained",
+      "short_label": "DINOv2 Kaggle grouped",
+      "description": "Production DINOv2 model trained on 90% of Kaggle plus the website's Unicode preview theme, with complete-linkage grouping at threshold 0.95. Best same-distribution accuracy; not an unseen-theme benchmark.",
+      "metadata_path": "dino-kaggle-grouped.json",
+      "grouping": true
+    },
+    {
+      "id": "dino-generated-grouped",
+      "label": "DINOv2 grouped · no Kaggle training",
+      "short_label": "DINOv2 generated-only",
+      "description": "DINOv2 grouping trained only on generated chess themes. Use this option to explore transfer to themes absent from chess-specific training.",
+      "metadata_path": "dino-generated-grouped.json",
+      "grouping": true
+    }
+  ]
+}

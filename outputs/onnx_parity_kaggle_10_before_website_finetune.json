@@ -1,0 +1,19 @@
+{
+  "checkpoint": "models/joint_dinov2_vits14_kaggle90.pt",
+  "onnx": "/tmp/chessocr_old_dino_int8.onnx",
+  "image_dir": "data/raw/kaggle_chess_positions/test",
+  "board_count": 10,
+  "square_label_agreement": 0.9984375,
+  "cluster_partition_agreement": 0.9,
+  "pytorch_square_accuracy": 1.0,
+  "onnx_square_accuracy": 0.9984375,
+  "pytorch_grouped_square_accuracy": 1.0,
+  "onnx_grouped_square_accuracy": 0.9984375,
+  "pytorch_exact_board_accuracy": 1.0,
+  "onnx_exact_board_accuracy": 0.9,
+  "pytorch_grouped_exact_board_accuracy": 1.0,
+  "onnx_grouped_exact_board_accuracy": 0.9,
+  "maximum_absolute_logit_error": 0.8694480061531067,
+  "maximum_absolute_embedding_error": 0.05824696272611618,
+  "similarity_threshold": 0.95
+}

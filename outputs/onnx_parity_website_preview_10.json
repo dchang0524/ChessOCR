@@ -1,0 +1,11 @@
+{
+  "checkpoint": "models/joint_dinov2_vits14_kaggle90_website.pt",
+  "onnx": "web/model/joint_dinov2_vits14_int8.onnx",
+  "image_dir": "data/evaluation/website_preview_v1",
+  "board_count": 10,
+  "square_label_agreement": 1.0,
+  "cluster_partition_agreement": 1.0,
+  "maximum_absolute_logit_error": 2.0720319747924805,
+  "maximum_absolute_embedding_error": 0.018984612077474594,
+  "similarity_threshold": 0.95
+}

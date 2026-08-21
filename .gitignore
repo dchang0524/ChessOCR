@@ -223,6 +223,7 @@ models/*.pt
 models/*.pth
 data/raw/*
 data/processed/*
+data/evaluation/*
 data/metadata/*
 outputs/confusion_matrices/*
 outputs/failure_cases/*

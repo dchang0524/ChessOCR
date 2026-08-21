@@ -1,0 +1,59 @@
+{
+  "checkpoint": "models/joint_dinov2_vits14_kaggle90_website.pt",
+  "evaluation_source": "data/metadata/kaggle_all_90_10.csv:test",
+  "skip_boards": 0,
+  "board_count": 100,
+  "elapsed_seconds": 120.53314912505448,
+  "preprocessing": "whole board resized to 8 * model input, then split",
+  "exact_identical_input_cache": {
+    "requests": 6400,
+    "unique_inputs": 4586,
+    "hit_rate": 0.2834375
+  },
+  "similarity_threshold": 0.132581889629364,
+  "duplicate_penalty": 1.5,
+  "baseline": {
+    "square_accuracy": 1.0,
+    "occupied_accuracy": 1.0,
+    "exact_board_accuracy": 1.0
+  },
+  "grouped": {
+    "square_accuracy": 0.98046875,
+    "occupied_accuracy": 0.8743718592964824,
+    "exact_board_accuracy": 0.21
+  },
+  "clustering": {
+    "scope": "all_64_squares_including_empty",
+    "false_merge_rate": 0.0013224674056789936,
+    "false_split_rate": 0.0,
+    "predicted_merged_pairs": 144427,
+    "true_same_pairs": 144236,
+    "cross_background_false_merge_rate": 0.001267375306623058,
+    "cross_background_false_split_rate": 0.0,
+    "cross_background_predicted_merged_pairs": 73380,
+    "cross_background_true_same_pairs": 73287
+  },
+  "threshold_sweep": [
+    {
+      "similarity_threshold": 0.9,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.35
+    },
+    {
+      "similarity_threshold": 0.95,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.35
+    },
+    {
+      "similarity_threshold": 0.98,
+      "square_accuracy": 1.0,
+      "occupied_accuracy": 1.0,
+      "exact_board_accuracy": 1.0,
+      "mean_group_count": 8.37
+    }
+  ]
+}

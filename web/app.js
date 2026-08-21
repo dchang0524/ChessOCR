@@ -17,6 +17,8 @@ const elements = {
   cropSize: document.querySelector("#crop-size"),
   orientation: document.querySelector("#orientation"),
   sideToMove: document.querySelector("#side-to-move"),
+  modelSelect: document.querySelector("#model-select"),
+  modelDescription: document.querySelector("#model-description"),
   threshold: document.querySelector("#threshold"),
   thresholdValue: document.querySelector("#threshold-value"),
   recognize: document.querySelector("#recognize"),
@@ -24,6 +26,7 @@ const elements = {
   resultSection: document.querySelector("#result-section"),
   cropPreview: document.querySelector("#crop-preview"),
   predictedBoard: document.querySelector("#predicted-board"),
+  groupBrowser: document.querySelector("#group-browser"),
   groupList: document.querySelector("#group-list"),
   groupSummary: document.querySelector("#group-summary"),
   boardFen: document.querySelector("#board-fen"),
@@ -39,6 +42,7 @@ const elements = {
   correctionPanel: document.querySelector("#correction-panel"),
   correctionSummary: document.querySelector("#correction-summary"),
   correctionClass: document.querySelector("#correction-class"),
+  correctionHelp: document.querySelector("#correction-help"),
   applySquare: document.querySelector("#apply-square"),
   applyGroup: document.querySelector("#apply-group"),
 };
@@ -53,6 +57,8 @@ const state = {
   classifierSession: null,
   similaritySession: null,
   metadata: null,
+  modelCatalog: null,
+  activeModel: null,
   modelReady: false,
   rawPredictions: null,
   predictions: null,
@@ -73,12 +79,53 @@ function setModelStatus(label, mode) {
   elements.modelStatus.dataset.mode = mode;
 }
 
-async function loadModel() {
+function groupingEnabled() {
+  return Boolean(state.activeModel?.grouping && state.metadata?.similarity);
+}
+
+function clearInferenceResults() {
+  state.rawPredictions = null;
+  state.predictions = null;
+  state.groups = [];
+  state.fixedGroupLabels.clear();
+  state.squareOverrides.clear();
+  state.selectedSquare = null;
+  elements.correctionPanel.hidden = true;
+  elements.resultSection.hidden = true;
+}
+
+function releaseCurrentSessions() {
+  const classifier = state.classifierSession;
+  const similarity = state.similaritySession;
+  state.classifierSession = null;
+  state.similaritySession = null;
+  if (similarity && similarity !== classifier) similarity.release();
+  if (classifier) classifier.release();
+}
+
+async function loadModel(modelId) {
+  const modelDefinition = state.modelCatalog.models.find((model) => model.id === modelId);
+  if (!modelDefinition) throw new Error(`Unknown model choice: ${modelId}`);
   try {
-    setModelStatus("Loading model…", "loading");
-    const metadataResponse = await fetch("./model/model.json", { cache: "no-store" });
+    setError();
+    state.modelReady = false;
+    state.activeModel = modelDefinition;
+    elements.modelSelect.disabled = true;
+    elements.modelDescription.textContent = modelDefinition.description;
+    setModelStatus(`Loading ${modelDefinition.short_label}…`, "loading");
+    updateRecognizeButton();
+    clearInferenceResults();
+    releaseCurrentSessions();
+
+    const metadataResponse = await fetch(
+      `./model/${modelDefinition.metadata_path}`,
+      { cache: "no-store" },
+    );
     if (!metadataResponse.ok) throw new Error(`Model metadata returned ${metadataResponse.status}`);
     state.metadata = await metadataResponse.json();
+    if (modelDefinition.grouping !== Boolean(state.metadata.similarity)) {
+      throw new Error("Model catalog grouping mode does not match its metadata");
+    }
     const modelBoardSize = state.metadata.input_size * 8;
     elements.cropPreview.width = modelBoardSize;
     elements.cropPreview.height = modelBoardSize;
@@ -93,28 +140,70 @@ async function loadModel() {
     window.ort.env.wasm.numThreads = 1;
     window.ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
     const options = { executionProviders: ["wasm"], graphOptimizationLevel: "all" };
-    state.classifierSession = await window.ort.InferenceSession.create(
+    const classifierSession = await window.ort.InferenceSession.create(
       `./model/${state.metadata.model_path}?v=${state.metadata.model_sha256}`,
       options,
     );
-    if (state.metadata.similarity.model_path === state.metadata.model_path) {
-      state.similaritySession = state.classifierSession;
-    } else {
-      state.similaritySession = await window.ort.InferenceSession.create(
+    let similaritySession = null;
+    if (state.metadata.similarity?.model_path === state.metadata.model_path) {
+      similaritySession = classifierSession;
+    } else if (state.metadata.similarity) {
+      similaritySession = await window.ort.InferenceSession.create(
         `./model/${state.metadata.similarity.model_path}?v=${state.metadata.similarity.model_sha256}`,
         options,
       );
     }
+    state.classifierSession = classifierSession;
+    state.similaritySession = similaritySession;
     state.modelReady = true;
-    const modelBytes = state.classifierSession === state.similaritySession
+    const modelBytes = !state.similaritySession || state.classifierSession === state.similaritySession
       ? state.metadata.model_bytes
       : state.metadata.model_bytes + state.metadata.similarity.model_bytes;
-    setModelStatus(`Models ready · ${(modelBytes / 1_000_000).toFixed(1)} MB`, "ready");
+    const mode = groupingEnabled() ? "grouped" : "one-shot";
+    setModelStatus(
+      `${modelDefinition.short_label} ready · ${mode} · ${(modelBytes / 1_000_000).toFixed(1)} MB`,
+      "ready",
+    );
     updateRecognizeButton();
   } catch (error) {
     console.error(error);
+    releaseCurrentSessions();
+    state.modelReady = false;
     setModelStatus("Model failed to load", "error");
     setError(`Could not load the browser model: ${error.message}`);
+  } finally {
+    elements.modelSelect.disabled = false;
+  }
+}
+
+async function loadModelCatalog() {
+  try {
+    setModelStatus("Loading model choices…", "loading");
+    const response = await fetch("./model/models.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`Model catalog returned ${response.status}`);
+    const catalog = await response.json();
+    if (!Array.isArray(catalog.models) || catalog.models.length === 0) {
+      throw new Error("Model catalog is empty");
+    }
+    if (!catalog.models.some((model) => model.id === catalog.default_model)) {
+      throw new Error("Default model is missing from the catalog");
+    }
+    state.modelCatalog = catalog;
+    elements.modelSelect.replaceChildren();
+    for (const model of catalog.models) {
+      const option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = model.label;
+      elements.modelSelect.append(option);
+    }
+    elements.modelSelect.value = catalog.default_model;
+    await loadModel(catalog.default_model);
+  } catch (error) {
+    console.error(error);
+    state.modelReady = false;
+    setModelStatus("Models failed to load", "error");
+    setError(`Could not load the model choices: ${error.message}`);
+    elements.modelSelect.disabled = true;
   }
 }
 
@@ -166,13 +255,7 @@ async function acceptFile(file) {
     setError();
     elements.uploadZone.querySelector("strong").textContent = "Opening image…";
     state.image = await decodeImage(file);
-    state.rawPredictions = null;
-    state.predictions = null;
-    state.groups = [];
-    state.fixedGroupLabels.clear();
-    state.squareOverrides.clear();
-    state.selectedSquare = null;
-    elements.correctionPanel.hidden = true;
+    clearInferenceResults();
     resetCrop();
     elements.editorSection.hidden = false;
     elements.resultSection.hidden = true;
@@ -416,6 +499,25 @@ async function runJointModelInBatches(tensor) {
   };
 }
 
+async function runClassifierInBatches(tensor) {
+  const batchSize = state.metadata.inference_batch_size ?? NUM_SQUARES;
+  const valuesPerSquare = tensor.data.length / NUM_SQUARES;
+  const logits = new Float32Array(NUM_SQUARES * state.metadata.class_names.length);
+  for (let start = 0; start < NUM_SQUARES; start += batchSize) {
+    const count = Math.min(batchSize, NUM_SQUARES - start);
+    const batch = new window.ort.Tensor(
+      "float32",
+      tensor.data.slice(start * valuesPerSquare, (start + count) * valuesPerSquare),
+      [count, 3, state.metadata.input_size, state.metadata.input_size],
+    );
+    const outputs = await state.classifierSession.run({
+      [state.metadata.input_name]: batch,
+    });
+    logits.set(outputs[state.metadata.output_name].data, start * state.metadata.class_names.length);
+  }
+  return { data: logits, dims: [NUM_SQUARES, state.metadata.class_names.length] };
+}
+
 function readPredictions(logits) {
   const classCount = state.metadata.class_names.length;
   if (logits.dims[0] !== NUM_SQUARES || logits.dims[1] !== classCount) {
@@ -471,6 +573,15 @@ function buildGroups(rawPredictions, embeddings) {
 }
 
 function applyGroupedAssignments() {
+  if (!groupingEnabled()) {
+    const predictions = state.rawPredictions.map((prediction) => ({ ...prediction }));
+    for (const [squareIndex, classId] of state.squareOverrides) {
+      predictions[squareIndex].classId = classId;
+      predictions[squareIndex].confidence = 1;
+    }
+    state.predictions = predictions;
+    return;
+  }
   const classCount = state.metadata.class_names.length;
   const squareLogits = state.rawPredictions.map((prediction) => prediction.logits);
   const assignments = assignGroupLabels(
@@ -537,6 +648,8 @@ function selectedGroupId() {
 
 function renderGroups() {
   elements.groupList.replaceChildren();
+  elements.groupBrowser.hidden = !groupingEnabled();
+  if (!groupingEnabled()) return;
   const activeGroupId = selectedGroupId();
   elements.groupSummary.textContent = `${state.groups.length} groups found · select one to highlight its squares.`;
   for (const group of state.groups) {
@@ -589,7 +702,10 @@ function selectSquare(squareIndex) {
   elements.correctionClass.value = String(prediction.classId);
   elements.correctionSummary.textContent = group
     ? `${prediction.square} belongs to group ${group.groupId}: ${group.squareIndices.map(squareName).join(", ")}`
-    : `${prediction.square} is not in an appearance group.`;
+    : `${prediction.square} was classified independently by the one-shot model.`;
+  elements.correctionHelp.textContent = group
+    ? "Apply a correction to this square or its whole appearance group. Fixed group labels are preserved while the remaining groups are reassigned."
+    : "The one-shot model has no appearance groups, so corrections apply to one square at a time.";
   elements.applyGroup.disabled = !group;
   elements.correctionPanel.hidden = false;
   renderBoard(state.predictions, Number(elements.threshold.value));
@@ -647,9 +763,10 @@ function showResults(predictions, elapsedMilliseconds) {
 }
 
 async function recognize() {
-  if (!state.image || !state.classifierSession || !state.similaritySession) return;
+  if (!state.image || !state.classifierSession) return;
   setError();
   elements.recognize.disabled = true;
+  elements.modelSelect.disabled = true;
   elements.recognize.textContent = "Recognizing…";
   await new Promise((resolve) => requestAnimationFrame(resolve));
   try {
@@ -657,7 +774,9 @@ async function recognize() {
     const start = performance.now();
     let logits;
     let embeddingTensor;
-    if (state.classifierSession === state.similaritySession) {
+    if (!groupingEnabled()) {
+      logits = await runClassifierInBatches(tensor);
+    } else if (state.classifierSession === state.similaritySession) {
       const jointOutputs = await runJointModelInBatches(tensor);
       logits = jointOutputs.logits;
       embeddingTensor = jointOutputs.embeddings;
@@ -675,8 +794,12 @@ async function recognize() {
     }
     const elapsed = performance.now() - start;
     state.rawPredictions = readPredictions(logits);
-    const embeddings = readEmbeddings(embeddingTensor);
-    state.groups = buildGroups(state.rawPredictions, embeddings);
+    if (groupingEnabled()) {
+      const embeddings = readEmbeddings(embeddingTensor);
+      state.groups = buildGroups(state.rawPredictions, embeddings);
+    } else {
+      state.groups = [];
+    }
     state.fixedGroupLabels.clear();
     state.squareOverrides.clear();
     state.selectedSquare = null;
@@ -689,6 +812,7 @@ async function recognize() {
     setError(`Recognition failed: ${error.message}`);
   } finally {
     elements.recognize.textContent = "Recognize position";
+    elements.modelSelect.disabled = !state.modelCatalog;
     updateRecognizeButton();
   }
 }
@@ -715,6 +839,9 @@ elements.editor.addEventListener("pointerup", endInteraction);
 elements.editor.addEventListener("pointercancel", endInteraction);
 elements.threshold.addEventListener("input", () => {
   elements.thresholdValue.textContent = `${Math.round(Number(elements.threshold.value) * 100)}%`;
+});
+elements.modelSelect.addEventListener("change", async () => {
+  await loadModel(elements.modelSelect.value);
 });
 elements.recognize.addEventListener("click", recognize);
 elements.applySquare.addEventListener("click", () => {
@@ -743,4 +870,4 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
   });
 });
 
-loadModel();
+loadModelCatalog();

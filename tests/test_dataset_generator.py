@@ -12,6 +12,7 @@ from torchvision import transforms
 from chess_ocr.data.dataset_generator import (
     GenerationConfig,
     ImageAssetBoardTheme,
+    WebsitePreviewBoardTheme,
     jitter_board_crop,
     render_square_backgrounds,
 )
@@ -112,3 +113,20 @@ def test_training_transforms_do_not_colour_jitter_composited_pieces() -> None:
     pipeline = build_train_transforms()
 
     assert not any(isinstance(transform, transforms.ColorJitter) for transform in pipeline.transforms)
+
+
+def test_website_preview_theme_uses_browser_palette_and_distinct_piece_glyphs() -> None:
+    theme = WebsitePreviewBoardTheme()
+    board = theme.render_board("8/8/8/8/8/8/Pp6/8", size=512)
+
+    assert board.getpixel((32, 32)) == theme.light_rgb
+    assert board.getpixel((96, 32)) == theme.dark_rgb
+    white_square = board.crop((0, 384, 64, 448))
+    black_square = board.crop((64, 384, 128, 448))
+    assert ImageChops.difference(
+        white_square, Image.new("RGB", white_square.size, theme.light_rgb)
+    ).getbbox() is not None
+    assert ImageChops.difference(
+        black_square, Image.new("RGB", black_square.size, theme.dark_rgb)
+    ).getbbox() is not None
+    assert ImageChops.difference(white_square, black_square).getbbox() is not None

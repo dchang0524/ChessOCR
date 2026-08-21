@@ -18,6 +18,7 @@ from chess_ocr.data.dataset_generator import (  # noqa: E402
     GenerationConfig,
     ImageAssetBoardTheme,
     SyntheticBoardTheme,
+    WebsitePreviewBoardTheme,
     class_coverage,
     generate_random_board_fens,
 )
@@ -41,6 +42,7 @@ BUILTIN_THEMES = {
         light_rgb=(222, 227, 230),
         dark_rgb=(140, 162, 173),
     ),
+    "website_preview": WebsitePreviewBoardTheme(),
 }
 
 BUNDLED_SPRITE_SETS = {

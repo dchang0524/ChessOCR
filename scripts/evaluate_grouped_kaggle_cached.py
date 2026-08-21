@@ -33,7 +33,13 @@ from chess_ocr.models.dino_joint_classifier import (  # noqa: E402
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--manifest", type=Path)
+    source.add_argument(
+        "--image-dir",
+        type=Path,
+        help="Directory of boards whose filenames encode board FEN with '-' separators.",
+    )
     parser.add_argument(
         "--data-root",
         type=Path,
@@ -129,13 +135,31 @@ def main() -> int:
     }
     assigner = GroupLabelAssigner(args.duplicate_penalty, class_names)
     empty_id = CLASS_NAME_TO_ID["empty"]
-    paths = manifest_paths(
-        args.manifest,
-        args.data_root,
-        args.split,
-        args.max_boards,
-        args.skip_boards,
-    )
+    if args.manifest is not None:
+        paths = manifest_paths(
+            args.manifest,
+            args.data_root,
+            args.split,
+            args.max_boards,
+            args.skip_boards,
+        )
+        evaluation_source = f"{args.manifest}:{args.split}"
+    else:
+        if not args.image_dir.is_dir():
+            raise FileNotFoundError(f"Board image directory not found: {args.image_dir}")
+        all_paths = sorted(
+            path
+            for path in args.image_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in {".jpeg", ".jpg", ".png"}
+        )
+        paths = all_paths[
+            args.skip_boards : args.skip_boards + args.max_boards
+            if args.max_boards is not None
+            else None
+        ]
+        if not paths:
+            raise ValueError(f"No board images found in {args.image_dir}")
+        evaluation_source = str(args.image_dir)
 
     # The key hashes the exact RGB bytes after whole-board resize and split.
     # Therefore cache hits skip only model calls whose input tensors are equal.
@@ -287,7 +311,7 @@ def main() -> int:
     board_count = len(paths)
     payload = {
         "checkpoint": str(args.checkpoint),
-        "evaluation_source": f"{args.manifest}:{args.split}",
+        "evaluation_source": evaluation_source,
         "skip_boards": args.skip_boards,
         "board_count": board_count,
         "elapsed_seconds": elapsed,
